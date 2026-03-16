@@ -1,0 +1,33 @@
+# Core API
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+python-multipart==0.0.18
+pydantic-settings==2.6.1
+aiofiles==23.2.1
+
+# Audio processing
+pydub==0.25.1
+librosa==0.10.2
+soundfile==0.12.1
+
+# Speech to text (Whisper)
+openai-whisper==20240930
+
+# NLP cleaning
+spacy==3.8.4
+fuzzywuzzy==0.18.0
+python-Levenshtein==0.25.1
+
+# LLM - Gemini
+google-genai==1.7.0
+
+# RAG / Vector search
+sentence-transformers==3.4.1
+faiss-cpu==1.9.0
+
+# Graph
+networkx==3.4.2
+
+# Export
+reportlab==4.3.1
+python-docx==1.1.2
