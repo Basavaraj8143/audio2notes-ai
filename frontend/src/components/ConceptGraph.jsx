@@ -7,68 +7,80 @@ export default function ConceptGraph({ graphData }) {
   const networkRef = useRef(null);
 
   useEffect(() => {
-    if (!containerRef.current || !graphData?.nodes?.length) return;
+    if (!containerRef.current || !graphData) return;
 
-    const PALETTE = ['#7c6bff', '#22d3ee', '#f472b6', '#34d399', '#fbbf24', '#a78bfa', '#fb923c'];
+    const { nodes, edges } = graphData;
 
-    const nodes = new DataSet(
-      graphData.nodes.map((n, i) => ({
+    // Create DataSets for vis-network
+    const visNodes = new DataSet(nodes.map(n => ({
         id: n.id,
         label: n.label,
         color: {
-          background: PALETTE[i % PALETTE.length] + '33',
-          border: PALETTE[i % PALETTE.length],
-          highlight: { background: PALETTE[i % PALETTE.length] + '55', border: PALETTE[i % PALETTE.length] },
+            background: '#3b82f6',
+            border: '#2563eb',
+            highlight: { background: '#60a5fa', border: '#3b82f6' }
         },
-        font: { color: '#f1f5f9', size: 13, face: 'Inter' },
-        borderWidth: 2,
-        shape: 'dot',
-        size: 18,
-      }))
-    );
+        font: { color: '#ffffff', face: 'Inter, system-ui, sans-serif' },
+        shape: 'box',
+        margin: 10,
+        borderRadius: 8
+    })));
 
-    const edges = new DataSet(
-      graphData.edges.map((e, i) => ({
+    const visEdges = new DataSet(edges.map((e, index) => ({
+        id: index,
         from: e.from,
         to: e.to,
         label: e.label,
         arrows: 'to',
-        color: { color: '#475569', highlight: '#7c6bff' },
-        font: { color: '#94a3b8', size: 10, face: 'Inter', align: 'middle' },
-        smooth: { type: 'curvedCW', roundness: 0.2 },
-        width: 1.5,
-      }))
-    );
+        color: { color: '#94a3b8', highlight: '#3b82f6' },
+        font: { align: 'top', size: 10, color: '#64748b' }
+    })));
+
+    const data = { nodes: visNodes, edges: visEdges };
 
     const options = {
-      nodes: { borderWidth: 2 },
-      edges: { arrows: { to: { enabled: true, scaleFactor: 0.6 } } },
       physics: {
         enabled: true,
-        solver: 'forceAtlas2Based',
-        forceAtlas2Based: { gravitationalConstant: -40, centralGravity: 0.005, springLength: 120 },
         stabilization: { iterations: 150 },
+        forceAtlas2Based: {
+            gravitationalConstant: -50,
+            centralGravity: 0.01,
+            springLength: 100,
+            springConstant: 0.08
+        },
+        solver: 'forceAtlas2Based'
       },
-      interaction: { hover: true, tooltipDelay: 200, zoomView: true, dragView: true },
-      layout: { randomSeed: 42 },
+      interaction: {
+        hover: true,
+        zoomView: true,
+        dragView: true
+      },
+      layout: {
+        randomSeed: 2
+      }
     };
 
-    if (networkRef.current) networkRef.current.destroy();
-    networkRef.current = new Network(containerRef.current, { nodes, edges }, options);
+    networkRef.current = new Network(containerRef.current, data, options);
 
-    return () => { if (networkRef.current) networkRef.current.destroy(); };
+    return () => {
+      if (networkRef.current) {
+        networkRef.current.destroy();
+        networkRef.current = null;
+      }
+    };
   }, [graphData]);
 
-  if (!graphData?.nodes?.length) {
-    return (
-      <div className="graph-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div className="empty-state">
-          <div className="big-icon">🕸️</div>
-          <p>No graph data available.</p>
-        </div>
-      </div>
-    );
-  }
-
-  return <div ref={containerRef} className="graph-container" id="concept-graph" />;
+  return (
+    <div 
+      ref={containerRef} 
+      style={{ 
+        height: '500px', 
+        width: '100%', 
+        backgroundColor: '#f8fafc',
+        borderRadius: '12px',
+        border: '1px solid #e2e8f0',
+        overflow: 'hidden'
+      }} 
+    />
+  );
 }

@@ -6,6 +6,10 @@ class Settings(BaseSettings):
     # Gemini LLM API
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     GEMINI_MODEL: str = "gemini-2.0-flash"
+    
+    # Ollama LLM
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "llama2:latest"
 
     # Whisper ASR model size: tiny | base | small | medium | large
     WHISPER_MODEL_SIZE: str = "base"
@@ -24,7 +28,7 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
 
     class Config:
-        env_file = ".env"
+        env_file = "../.env"
 
 
 settings = Settings()

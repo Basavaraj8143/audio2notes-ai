@@ -5,9 +5,14 @@ def build_graph(triples: list[dict]) -> dict:
     """Build a NetworkX graph from triples and return a serializable dict."""
     G = nx.DiGraph()
     for triple in triples:
-        G.add_node(triple["source"])
-        G.add_node(triple["target"])
-        G.add_edge(triple["source"], triple["target"], label=triple["relation"])
+        # Check if keys exist in the triple (robustness)
+        source = triple.get("source", "Unknown")
+        target = triple.get("target", "Unknown")
+        relation = triple.get("relation", "is related to")
+        
+        G.add_node(source)
+        G.add_node(target)
+        G.add_edge(source, target, label=relation)
 
     nodes = [{"id": n, "label": n} for n in G.nodes()]
     edges = [

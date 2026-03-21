@@ -3,7 +3,7 @@ import re
 
 import spacy
 import whisper
-from fuzzywuzzy import fuzz
+from rapidfuzz import fuzz
 
 from core.config import settings
 
@@ -30,7 +30,8 @@ def _load_spacy():
             _nlp = spacy.load("en_core_web_sm")
         except OSError:
             import subprocess
-            subprocess.run(["python", "-m", "spacy", "download", "en_core_web_sm"], check=True)
+            import sys
+            subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_sm"], check=True)
             _nlp = spacy.load("en_core_web_sm")
     return _nlp
 
@@ -66,13 +67,15 @@ def clean_transcript(raw_text: str) -> str:
 
 
 async def transcribe_all_chunks(chunk_paths: list[str]) -> list[dict]:
-    """Transcribe all audio chunks in parallel using asyncio executor."""
+    """Transcribe all audio chunks sequentially to avoid CPU/RAM overload."""
     loop = asyncio.get_event_loop()
-    tasks = [loop.run_in_executor(None, transcribe_chunk, path) for path in chunk_paths]
-    results = await asyncio.gather(*tasks)
-
     cleaned = []
-    for r in results:
+    
+    for i, path in enumerate(chunk_paths):
+        print(f"--- Transcribing chunk {i+1}/{len(chunk_paths)}: {path} ---")
+        # Transcribe
+        r = await loop.run_in_executor(None, transcribe_chunk, path)
+        # Clean
         cleaned_text = await loop.run_in_executor(None, clean_transcript, r["text"])
         cleaned.append(
             {

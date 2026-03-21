@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ConceptGraph from '../components/ConceptGraph.jsx';
 import QAChat from '../components/QAChat.jsx';
+import ConceptGraph from '../components/ConceptGraph.jsx';
 
 export default function NotesPage({ session }) {
   const navigate = useNavigate();
@@ -40,14 +40,6 @@ export default function NotesPage({ session }) {
         <div className="stat-card">
           <div className="stat-number">{notes.filter(n => n.confidence === 'HIGH').length}</div>
           <div className="stat-label">High Confidence</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-number">{graph?.nodes?.length || 0}</div>
-          <div className="stat-label">Concepts Mapped</div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-number">{graph?.edges?.length || 0}</div>
-          <div className="stat-label">Relationships</div>
         </div>
       </div>
 
