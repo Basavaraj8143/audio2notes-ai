@@ -10,10 +10,9 @@ from core.config import settings
 _whisper_model = None
 _nlp = None
 
-FILLER_WORDS = re.compile(
-    r"\b(uh+|um+|hmm+|like|you know|basically|actually|literally|right|okay|so|well)\b",
-    re.IGNORECASE,
-)
+# Keep this list conservative: removing semantic words like "like" hurts transcript quality.
+DISFLUENCY_WORDS = re.compile(r"\b(uh+|um+|hmm+|erm+|ah+|mm+)\b", re.IGNORECASE)
+DISFLUENCY_PHRASES = re.compile(r"\b(you know|i mean)\b", re.IGNORECASE)
 
 
 def _load_whisper():
@@ -44,26 +43,95 @@ def transcribe_chunk(chunk_path: str) -> dict:
     return {"text": result["text"].strip(), "segments": result["segments"], "avg_confidence": avg_conf}
 
 
-def remove_duplicates(sentences: list[str], threshold: int = 85) -> list[str]:
-    """Remove near-duplicate sentences using fuzzy matching."""
+def _normalize_for_match(text: str) -> str:
+    text = text.lower()
+    text = re.sub(r"[^a-z0-9\s]", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _cleanup_disfluencies(text: str) -> str:
+    text = DISFLUENCY_PHRASES.sub(" ", text)
+    text = DISFLUENCY_WORDS.sub(" ", text)
+    # Remove immediate word stutter: "the the" -> "the"
+    text = re.sub(r"\b(\w+)(\s+\1\b)+", r"\1", text, flags=re.IGNORECASE)
+    text = re.sub(r"\s+([,;:.!?])", r"\1", text)
+    text = re.sub(r"([,;:.!?])\1+", r"\1", text)
+    return re.sub(r"\s{2,}", " ", text).strip()
+
+
+def _dedupe_clauses(sentence: str, threshold: int = 95) -> str:
+    """
+    Remove repeated comma/semicolon clauses inside one sentence.
+    Useful for ASR loops like repeated lyric or repeated phrase chunks.
+    """
+    chunks = [c.strip() for c in re.split(r"[;,]+", sentence) if c.strip()]
+    if len(chunks) < 2:
+        return sentence.strip()
+
+    kept_clauses: list[str] = []
+    kept_norms: list[str] = []
+    for clause in chunks:
+        norm = _normalize_for_match(clause)
+        if not norm:
+            continue
+
+        # Compare with recent clauses only, preserving some recurring structure.
+        recent = kept_norms[-4:]
+        is_dup = any(fuzz.ratio(norm, prev) >= threshold for prev in recent)
+        if is_dup:
+            continue
+
+        kept_clauses.append(clause)
+        kept_norms.append(norm)
+
+    if not kept_clauses:
+        return sentence.strip()
+
+    ending = sentence.strip()[-1] if sentence.strip() and sentence.strip()[-1] in ".!?" else ""
+    cleaned = ", ".join(kept_clauses)
+    if ending and not cleaned.endswith(ending):
+        cleaned += ending
+    return cleaned
+
+
+def remove_duplicates(sentences: list[str], threshold: int = 90) -> list[str]:
+    """Remove near-duplicate sentences while preserving overall flow."""
     unique = []
+    unique_norms: list[str] = []
     for sent in sentences:
-        is_dup = any(fuzz.ratio(sent, u) > threshold for u in unique)
+        norm = _normalize_for_match(sent)
+        if not norm:
+            continue
+
+        recent = unique_norms[-8:]
+        # For short lines, require exact match; for longer lines, fuzzy match is useful.
+        if len(norm.split()) < 4:
+            is_dup = norm in recent
+        else:
+            is_dup = any(fuzz.ratio(norm, u) >= threshold for u in recent)
+
         if not is_dup:
             unique.append(sent)
+            unique_norms.append(norm)
     return unique
 
 
 def clean_transcript(raw_text: str) -> str:
-    """Remove filler words, fix sentences, and remove near-duplicates."""
-    text = FILLER_WORDS.sub("", raw_text)
-    text = re.sub(r"\s{2,}", " ", text).strip()
+    """Conservative transcript cleaning: remove disfluencies and obvious repetition."""
+    text = _cleanup_disfluencies(raw_text)
 
     nlp = _load_spacy()
     doc = nlp(text)
-    sentences = [sent.text.strip() for sent in doc.sents if len(sent.text.strip()) > 10]
+    sentences: list[str] = []
+    for sent in doc.sents:
+        s = _dedupe_clauses(sent.text.strip())
+        s = re.sub(r"\s{2,}", " ", s).strip()
+        if len(_normalize_for_match(s)) >= 10:
+            sentences.append(s)
+
     unique_sentences = remove_duplicates(sentences)
-    return " ".join(unique_sentences)
+    cleaned = " ".join(unique_sentences).strip()
+    return cleaned or raw_text.strip()
 
 
 async def transcribe_all_chunks(chunk_paths: list[str]) -> list[dict]:

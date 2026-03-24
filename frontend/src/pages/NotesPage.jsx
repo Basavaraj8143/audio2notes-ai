@@ -1,7 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import QAChat from '../components/QAChat.jsx';
-import ConceptGraph from '../components/ConceptGraph.jsx';
 
 export default function NotesPage({ session }) {
   const navigate = useNavigate();
@@ -13,7 +12,7 @@ export default function NotesPage({ session }) {
 
   if (!session) return null;
 
-  const { session_id, filename, notes, graph, chunk_count } = session;
+  const { session_id, filename, notes = [], chunk_count } = session;
 
   const handleExport = (format) => {
     window.open(`/api/v1/export/${session_id}/${format}`, '_blank');
@@ -21,44 +20,38 @@ export default function NotesPage({ session }) {
 
   return (
     <main className="container" style={{ paddingTop: 32, paddingBottom: 60 }}>
-      {/* Header */}
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontFamily: 'var(--font-display)', fontSize: '1.8rem', fontWeight: 700, marginBottom: 4 }}>
-          📋 Lecture Notes
+          Lecture Notes
         </h1>
         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-          {filename} — {chunk_count} sections processed
+          {filename} - {chunk_count} sections processed
         </p>
       </div>
 
-      {/* Stats */}
       <div className="stats-row">
         <div className="stat-card">
           <div className="stat-number">{chunk_count}</div>
           <div className="stat-label">Sections</div>
         </div>
         <div className="stat-card">
-          <div className="stat-number">{notes.filter(n => n.confidence === 'HIGH').length}</div>
+          <div className="stat-number">{notes.filter((n) => n.confidence === 'HIGH').length}</div>
           <div className="stat-label">High Confidence</div>
         </div>
       </div>
 
-      {/* Export bar */}
       <div className="export-bar">
         <span>Export notes as:</span>
-        <button className="btn btn-secondary btn-sm" onClick={() => handleExport('pdf')}>📄 PDF</button>
-        <button className="btn btn-secondary btn-sm" onClick={() => handleExport('docx')}>📝 DOCX</button>
-        <button className="btn btn-secondary btn-sm" onClick={() => handleExport('txt')}>📃 TXT</button>
+        <button className="btn btn-secondary btn-sm" onClick={() => handleExport('pdf')}>PDF</button>
+        <button className="btn btn-secondary btn-sm" onClick={() => handleExport('docx')}>DOCX</button>
+        <button className="btn btn-secondary btn-sm" onClick={() => handleExport('txt')}>TXT</button>
       </div>
 
-      {/* Tabs */}
       <div className="tabs">
-        <button id="tab-notes" className={`tab ${activeTab === 'notes' ? 'active' : ''}`} onClick={() => setActiveTab('notes')}>📋 Notes</button>
-        <button id="tab-graph" className={`tab ${activeTab === 'graph' ? 'active' : ''}`} onClick={() => setActiveTab('graph')}>🕸️ Concept Map</button>
-        <button id="tab-qa" className={`tab ${activeTab === 'qa' ? 'active' : ''}`} onClick={() => setActiveTab('qa')}>💬 Q&amp;A</button>
+        <button id="tab-notes" className={`tab ${activeTab === 'notes' ? 'active' : ''}`} onClick={() => setActiveTab('notes')}>Notes</button>
+        <button id="tab-qa" className={`tab ${activeTab === 'qa' ? 'active' : ''}`} onClick={() => setActiveTab('qa')}>Q&A</button>
       </div>
 
-      {/* Notes Tab */}
       {activeTab === 'notes' && (
         <div className="notes-grid">
           {notes.map((chunk, i) => (
@@ -100,17 +93,6 @@ export default function NotesPage({ session }) {
         </div>
       )}
 
-      {/* Graph Tab */}
-      {activeTab === 'graph' && (
-        <div>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: 16 }}>
-            {graph?.nodes?.length || 0} concepts · {graph?.edges?.length || 0} relationships — drag to explore
-          </p>
-          <ConceptGraph graphData={graph} />
-        </div>
-      )}
-
-      {/* Q&A Tab */}
       {activeTab === 'qa' && (
         <div>
           <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: 16 }}>
