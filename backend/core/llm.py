@@ -1,12 +1,12 @@
 ﻿import asyncio
+import json
 import re
 
 import ollama
-from google import genai
+import requests
 
 from core.config import settings
 
-_gemini_client = None
 _ollama_client = None
 
 NOTES_JSON_PROMPT = """Extract notes from the transcript.
@@ -22,13 +22,6 @@ Transcript:
 """
 
 
-def _get_gemini_client():
-    global _gemini_client
-    if _gemini_client is None and settings.GEMINI_API_KEY:
-        _gemini_client = genai.Client(api_key=settings.GEMINI_API_KEY)
-    return _gemini_client
-
-
 def _get_ollama_client():
     global _ollama_client
     if _ollama_client is None:
@@ -36,108 +29,217 @@ def _get_ollama_client():
     return _ollama_client
 
 
+def _get_openrouter_api_key() -> str:
+    return (settings.OPENROUTER_API_KEY or settings.OPEN_ROUTERAPI_KEY or '').strip()
+
+
+def _get_mistral_api_key() -> str:
+    # Supports both standard and local alias env names.
+    return (settings.MISTRAL_API_KEY or settings.MISTRELL_MODEL_API_KEY or '').strip()
+
+
+def _strip_code_fences(text: str) -> str:
+    text = text.strip()
+    if text.startswith('```'):
+        text = re.sub(r'^```[a-zA-Z0-9_-]*\n?', '', text)
+        text = re.sub(r'\n?```$', '', text)
+    return text.strip()
+
+
+def _extract_text_content(content) -> str:
+    """Normalize provider response content to plain text."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict):
+                if isinstance(item.get('text'), str):
+                    parts.append(item['text'])
+            elif isinstance(item, str):
+                parts.append(item)
+        return '\n'.join(parts)
+    return str(content or '')
+
+
+def _openrouter_chat(
+    messages: list[dict],
+    *,
+    model: str | None = None,
+    temperature: float = 0.2,
+    response_format_json: bool = False,
+    timeout: int = 90,
+) -> str:
+    api_key = _get_openrouter_api_key()
+    if not api_key:
+        raise RuntimeError('OPENROUTER_API_KEY is not configured.')
+
+    selected_model = model or settings.OPENROUTER_MODEL
+    if settings.OPENROUTER_FREE_ONLY and ':free' not in selected_model:
+        raise RuntimeError(f"OpenRouter model '{selected_model}' is not marked free (:free).")
+
+    url = f"{settings.OPENROUTER_BASE_URL.rstrip('/')}/chat/completions"
+    headers = {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json',
+    }
+    if settings.OPENROUTER_HTTP_REFERER:
+        headers['HTTP-Referer'] = settings.OPENROUTER_HTTP_REFERER
+    if settings.OPENROUTER_APP_TITLE:
+        headers['X-Title'] = settings.OPENROUTER_APP_TITLE
+
+    payload = {
+        'model': selected_model,
+        'temperature': temperature,
+        'messages': messages,
+    }
+    if response_format_json:
+        payload['response_format'] = {'type': 'json_object'}
+
+    resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
+    resp.raise_for_status()
+
+    body = resp.json()
+    content = body.get('choices', [{}])[0].get('message', {}).get('content', '')
+    text = _extract_text_content(content)
+    if not text:
+        raise RuntimeError('OpenRouter returned empty content.')
+
+    raw = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+    return _strip_code_fences(raw)
+
+
+def _mistral_chat(
+    messages: list[dict],
+    *,
+    model: str | None = None,
+    temperature: float = 0.2,
+    response_format_json: bool = False,
+    timeout: int = 90,
+) -> str:
+    api_key = _get_mistral_api_key()
+    if not api_key:
+        raise RuntimeError('MISTRAL_API_KEY is not configured.')
+
+    selected_model = model or settings.MISTRAL_MODEL
+    url = f"{settings.MISTRAL_BASE_URL.rstrip('/')}/chat/completions"
+    headers = {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json',
+    }
+    payload = {
+        'model': selected_model,
+        'temperature': temperature,
+        'messages': messages,
+    }
+    if response_format_json:
+        payload['response_format'] = {'type': 'json_object'}
+
+    resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
+    resp.raise_for_status()
+
+    body = resp.json()
+    content = body.get('choices', [{}])[0].get('message', {}).get('content', '')
+    text = _extract_text_content(content)
+    if not text:
+        raise RuntimeError('Mistral returned empty content.')
+
+    raw = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+    return _strip_code_fences(raw)
+
+
+def _normalize_notes_payload(data: dict, raw: str) -> dict:
+    return {
+        'topic': str(data.get('topic', '')).strip(),
+        'key_points': data.get('key_points', []) if isinstance(data.get('key_points', []), list) else [],
+        'definitions': data.get('definitions', {}) if isinstance(data.get('definitions', {}), dict) else {},
+        'summary': str(data.get('summary', '')).strip(),
+        'confidence': str(data.get('confidence', 'MEDIUM')).upper(),
+        'raw': raw,
+    }
+
+
+def _call_mistral_for_notes(chunk_text: str) -> dict:
+    raw = _mistral_chat(
+        [
+            {'role': 'system', 'content': 'You are a data extraction bot. You ONLY output valid JSON. No extra text.'},
+            {'role': 'user', 'content': NOTES_JSON_PROMPT.format(chunk_text=chunk_text)},
+        ],
+        response_format_json=True,
+    )
+    data = json.loads(raw)
+    if not isinstance(data, dict):
+        raise RuntimeError('Mistral response JSON is not an object.')
+    return _normalize_notes_payload(data, raw)
+
+
+def _call_openrouter_for_notes(chunk_text: str) -> dict:
+    raw = _openrouter_chat(
+        [
+            {'role': 'system', 'content': 'You are a data extraction bot. You ONLY output valid JSON. No extra text.'},
+            {'role': 'user', 'content': NOTES_JSON_PROMPT.format(chunk_text=chunk_text)},
+        ],
+        response_format_json=True,
+    )
+    data = json.loads(raw)
+    if not isinstance(data, dict):
+        raise RuntimeError('OpenRouter response JSON is not an object.')
+    return _normalize_notes_payload(data, raw)
+
+
 async def generate_notes_for_chunk(chunk_text: str) -> dict:
-    """Send a transcript chunk to the configured LLM and parse structured notes response."""
-    print(f"--- [LLM] Attempting local inference with {settings.OLLAMA_MODEL} ---")
+    """Generate structured notes for a transcript chunk.
+
+    Priority order:
+    1) Mistral API key (free tier)
+    2) OpenRouter free model fallback
+    3) Optional local Ollama fallback
+    """
+    loop = asyncio.get_event_loop()
+
+    print(f"--- [LLM] Attempting Mistral inference with {settings.MISTRAL_MODEL} ---")
+    try:
+        return await loop.run_in_executor(None, _call_mistral_for_notes, chunk_text)
+    except Exception as mistral_err:
+        print(f"[LLM] Mistral failed: {mistral_err}")
+        print(f"--- [LLM] Falling back to OpenRouter ({settings.OPENROUTER_MODEL}) ---")
+
+    try:
+        return await loop.run_in_executor(None, _call_openrouter_for_notes, chunk_text)
+    except Exception as openrouter_err:
+        print(f"[LLM] OpenRouter failed: {openrouter_err}")
+        print(f"--- [LLM] Falling back to Ollama ({settings.OLLAMA_MODEL}) ---")
 
     try:
         client = _get_ollama_client()
-        system_msg = "You are a data extraction bot. You ONLY output JSON. No thinking, no chatting."
-
         response = client.chat(
             model=settings.OLLAMA_MODEL,
             format='json',
             messages=[
-                {'role': 'system', 'content': system_msg},
-                {'role': 'user', 'content': NOTES_JSON_PROMPT.format(chunk_text=chunk_text)}
+                {'role': 'system', 'content': 'You are a data extraction bot. You ONLY output valid JSON. No extra text.'},
+                {'role': 'user', 'content': NOTES_JSON_PROMPT.format(chunk_text=chunk_text)},
             ],
         )
-        import json
-        raw = response['message']['content']
-        raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL).strip()
+        raw = re.sub(r'<think>.*?</think>', '', response['message']['content'], flags=re.DOTALL).strip()
         data = json.loads(raw)
-        data['raw'] = raw
-        print("[LLM] Local inference successful.")
-        return data
+        return _normalize_notes_payload(data, raw)
 
     except Exception as ollama_err:
         print(f"[LLM] Ollama failed: {ollama_err}")
-        print(f"--- [LLM] Falling back to Gemini ({settings.GEMINI_MODEL}) ---")
-
-        gemini = _get_gemini_client()
-        if not gemini:
-            return {
-                "topic": "Ollama Error",
-                "key_points": [],
-                "definitions": {},
-                "summary": f"Ollama failed and no Gemini key: {ollama_err}",
-                "confidence": "LOW",
-                "raw": "",
-            }
-
-        try:
-            prompt = (
-                "Follow this format exactly: TOPIC: ... KEY POINTS: ... DEFINITIONS: ... SUMMARY: ... "
-                f"CONFIDENCE: ...\n\nTranscript:\n{chunk_text}"
-            )
-            loop = asyncio.get_event_loop()
-            response = await loop.run_in_executor(
-                None,
-                lambda: gemini.models.generate_content(model=settings.GEMINI_MODEL, contents=prompt),
-            )
-            return _parse_notes_response(response.text)
-        except Exception as gemini_err:
-            error_msg = str(gemini_err)
-            if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
-                return {
-                    "topic": "Quota Limit Reached",
-                    "key_points": [
-                        "Ollama failed to respond (local LLM not running?)",
-                        "Gemini API quota exhausted (429 Error)",
-                    ],
-                    "definitions": {},
-                    "summary": "Both local LLM and Cloud LLM failed. Please ensure Ollama is running locally.",
-                    "confidence": "LOW",
-                    "raw": error_msg,
-                }
-            return {
-                "topic": "LLM Error",
-                "key_points": [],
-                "definitions": {},
-                "summary": f"Multiple LLM failures: {gemini_err}",
-                "confidence": "LOW",
-                "raw": error_msg,
-            }
-
-
-def _parse_notes_response(raw: str) -> dict:
-    """Fallback manual parser for Gemini/text responses."""
-    result = {"topic": "", "key_points": [], "definitions": {}, "summary": "", "confidence": "MEDIUM", "raw": raw}
-    m = re.search(r"TOPIC:\s*(.+)", raw)
-    if m:
-        result["topic"] = m.group(1).strip()
-    kp_match = re.search(r"KEY POINTS:\s*((?:[-•]\s*.+\n?)+)", raw)
-    if kp_match:
-        result["key_points"] = [re.sub(r"^[-•]\s*", "", l).strip() for l in kp_match.group(1).strip().split("\n") if l.strip()]
-    def_match = re.search(r"DEFINITIONS:\s*((?:[-•]\s*.+:.+\n?)+)", raw)
-    if def_match:
-        for line in def_match.group(1).strip().split("\n"):
-            if ":" in line:
-                term, defn = line.split(":", 1)
-                result["definitions"][re.sub(r"^[-•]\s*", "", term).strip()] = defn.strip()
-    m = re.search(r"SUMMARY:\s*(.+?)(?=\nCONFIDENCE|$)", raw, re.DOTALL)
-    if m:
-        result["summary"] = m.group(1).strip()
-    m = re.search(r"CONFIDENCE:\s*(HIGH|MEDIUM|LOW)", raw, re.IGNORECASE)
-    if m:
-        result["confidence"] = m.group(1).upper()
-    return result
+        return {
+            'topic': 'LLM Error',
+            'key_points': [],
+            'definitions': {},
+            'summary': f'Mistral, OpenRouter, and Ollama all failed. Last error: {ollama_err}',
+            'confidence': 'LOW',
+            'raw': '',
+        }
 
 
 async def generate_all_notes(transcript_chunks: list[dict]) -> list[dict]:
     """Generate notes for all transcript chunks sequentially."""
     results = []
     for chunk in transcript_chunks:
-        res = await generate_notes_for_chunk(chunk["cleaned_text"])
+        res = await generate_notes_for_chunk(chunk['cleaned_text'])
         results.append(res)
     return results

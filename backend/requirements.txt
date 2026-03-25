@@ -4,6 +4,7 @@ uvicorn[standard]==0.32.0
 python-multipart==0.0.18
 pydantic-settings==2.6.1
 aiofiles==23.2.1
+requests==2.32.3
 
 # Audio processing
 pydub==0.25.1
@@ -15,8 +16,7 @@ soundfile==0.12.1
 # NLP cleaning
 spacy
 rapidfuzz
-# LLM - Gemini & Ollama
-google-genai==1.7.0
+# LLM - OpenRouter & Ollama
 ollama==0.4.7
 
 # RAG / Vector search

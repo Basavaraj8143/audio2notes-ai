@@ -15,8 +15,8 @@ const TRANSCRIBE_STEPS = ['upload', 'chunk', 'transcribe', 'clean'];
 
 const FEATURES = [
   { icon: 'ASR', color: '#7c6bff', title: 'Whisper ASR', desc: 'OpenAI Whisper transcription with confidence scoring per segment.' },
-  { icon: 'AI', color: '#22d3ee', title: 'AI Note Generation', desc: 'Gemini 2.0 Flash generates structured notes: topics, key points, definitions, summaries.' },
-  { icon: 'QA', color: '#34d399', title: 'RAG Q&A', desc: 'Ask questions grounded in your lecture. FAISS + Gemini ensures no hallucination.' },
+  { icon: 'AI', color: '#22d3ee', title: 'AI Note Generation', desc: 'OpenRouter generates structured notes: topics, key points, definitions, and summaries.' },
+  { icon: 'QA', color: '#34d399', title: 'RAG Q&A', desc: 'Ask questions grounded in your lecture. Retrieval keeps responses anchored to transcript content.' },
   { icon: 'EX', color: '#fbbf24', title: 'Export', desc: 'Download your notes as PDF, DOCX, or plain text.' },
   { icon: 'PR', color: '#a78bfa', title: 'Privacy First', desc: 'Audio processed locally via Whisper. Only transcript text sent to the LLM.' },
 ];
@@ -167,7 +167,7 @@ export default function HomePage({ onSessionReady }) {
           <span className="gradient-text">Structured Notes</span>
         </h1>
         <p className="hero-subtitle">
-          Upload any lecture audio. Whisper transcribes it. Gemini AI structures it.
+          Upload any lecture audio. Whisper transcribes it. OpenRouter structures it.
           Get notes and a smart Q&A in minutes.
         </p>
         <div className="hero-actions">
