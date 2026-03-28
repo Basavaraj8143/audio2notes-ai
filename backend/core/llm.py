@@ -9,15 +9,53 @@ from core.config import settings
 
 _ollama_client = None
 
-NOTES_JSON_PROMPT = """Extract notes from the transcript.
-Return ONLY a JSON object in this format:
-{{"topic": "...", "key_points": ["...", "..."], "definitions": {{"word": "definition"}}, "summary": "...", "confidence": "HIGH"}}
+NOTES_JSON_PROMPT = """You are a highly precise academic assistant trained to generate structured study notes from lecture transcripts.
 
-Example:
-Input: "Hi, today we will talk about Photosynthesis. It's the process where plants convert sunlight into energy."
-Output: {{"topic": "Photosynthesis", "key_points": ["Plants convert sunlight to energy"], "definitions": {{"Photosynthesis": "Energy conversion process in plants"}}, "summary": "Introduction to how plants use sunlight.", "confidence": "HIGH"}}
+INSTRUCTIONS:
+- Extract only meaningful academic content
+- Remove filler words, repetitions, and noise
+- Organize information logically
+- Keep explanations concise but informative
+- Highlight important concepts clearly
+- Do NOT invent or assume missing information
 
-Transcript:
+OUTPUT FORMAT (STRICT):
+
+TOPIC:
+<Detected topic>
+
+KEY POINTS:
+- ...
+
+DEFINITIONS:
+- ...
+
+IMPORTANT EXPLANATIONS:
+- ...
+
+EXAMPLES (if present in transcript):
+- ...
+
+SUMMARY:
+<Short academic summary>
+
+CONFIDENCE:
+<HIGH / MEDIUM / LOW based on clarity>
+
+If the transcript is poor quality, still attempt output but reduce confidence.
+
+IMPORTANT: Return ONLY JSON using this schema:
+{{
+  "topic": "...",
+  "key_points": ["...", "..."],
+  "definitions": {{"term": "definition"}},
+  "important_explanations": ["...", "..."],
+  "examples": ["...", "..."],
+  "summary": "...",
+  "confidence": "HIGH"
+}}
+
+TRANSCRIPT:
 {chunk_text}
 """
 
@@ -153,6 +191,8 @@ def _normalize_notes_payload(data: dict, raw: str) -> dict:
         'topic': str(data.get('topic', '')).strip(),
         'key_points': data.get('key_points', []) if isinstance(data.get('key_points', []), list) else [],
         'definitions': data.get('definitions', {}) if isinstance(data.get('definitions', {}), dict) else {},
+        'important_explanations': data.get('important_explanations', []) if isinstance(data.get('important_explanations', []), list) else [],
+        'examples': data.get('examples', []) if isinstance(data.get('examples', []), list) else [],
         'summary': str(data.get('summary', '')).strip(),
         'confidence': str(data.get('confidence', 'MEDIUM')).upper(),
         'raw': raw,
@@ -230,6 +270,8 @@ async def generate_notes_for_chunk(chunk_text: str) -> dict:
             'topic': 'LLM Error',
             'key_points': [],
             'definitions': {},
+            'important_explanations': [],
+            'examples': [],
             'summary': f'Mistral, OpenRouter, and Ollama all failed. Last error: {ollama_err}',
             'confidence': 'LOW',
             'raw': '',

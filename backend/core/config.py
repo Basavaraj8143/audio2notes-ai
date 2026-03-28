@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     # Chunking
     MIN_SILENCE_LEN_MS: int = 700
     SILENCE_THRESH_DB: int = -40
+    KEEP_SILENCE_MS: int = 300
+    MIN_CHUNK_LEN_MS: int = 45_000
+    MAX_CHUNK_LEN_MS: int = 120_000
     MAX_WORDS_PER_CHUNK: int = 500
 
     # FAISS vector index

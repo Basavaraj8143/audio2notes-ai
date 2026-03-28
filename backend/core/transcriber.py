@@ -134,23 +134,41 @@ def clean_transcript(raw_text: str) -> str:
     return cleaned or raw_text.strip()
 
 
-async def transcribe_all_chunks(chunk_paths: list[str]) -> list[dict]:
+async def transcribe_all_chunks(chunk_paths: list[dict | str]) -> list[dict]:
     """Transcribe all audio chunks sequentially to avoid CPU/RAM overload."""
     loop = asyncio.get_event_loop()
     cleaned = []
     
-    for i, path in enumerate(chunk_paths):
+    for i, chunk in enumerate(chunk_paths):
+        path = chunk["path"] if isinstance(chunk, dict) else chunk
+        chunk_start_sec = float(chunk.get("start_sec", 0)) if isinstance(chunk, dict) else 0.0
+        chunk_end_sec = float(chunk.get("end_sec", 0)) if isinstance(chunk, dict) else 0.0
         print(f"--- Transcribing chunk {i+1}/{len(chunk_paths)}: {path} ---")
         # Transcribe
         r = await loop.run_in_executor(None, transcribe_chunk, path)
+        shifted_segments = []
+        for seg in r["segments"]:
+            item = dict(seg)
+            if isinstance(item.get("start"), (int, float)):
+                item["start"] = round(float(item["start"]) + chunk_start_sec, 3)
+            if isinstance(item.get("end"), (int, float)):
+                item["end"] = round(float(item["end"]) + chunk_start_sec, 3)
+            shifted_segments.append(item)
+
+        if chunk_end_sec <= chunk_start_sec and shifted_segments:
+            end_candidate = shifted_segments[-1].get("end")
+            if isinstance(end_candidate, (int, float)):
+                chunk_end_sec = float(end_candidate)
         # Clean
         cleaned_text = await loop.run_in_executor(None, clean_transcript, r["text"])
         cleaned.append(
             {
                 "raw_text": r["text"],
                 "cleaned_text": cleaned_text,
-                "segments": r["segments"],
+                "segments": shifted_segments,
                 "avg_confidence": r["avg_confidence"],
+                "chunk_start_sec": round(chunk_start_sec, 3),
+                "chunk_end_sec": round(chunk_end_sec, 3) if chunk_end_sec > 0 else None,
             }
         )
     return cleaned

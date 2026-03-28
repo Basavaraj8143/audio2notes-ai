@@ -48,7 +48,8 @@ async def upload_audio(file: UploadFile = File(...)):
         }
 
         # Clean up temp audio files
-        for path in chunk_paths:
+        for chunk in chunk_paths:
+            path = chunk["path"] if isinstance(chunk, dict) else chunk
             if os.path.exists(path):
                 os.unlink(path)
 
@@ -128,6 +129,15 @@ def _merge_notes(notes_chunks: list[dict]) -> str:
             parts.append("Definitions:")
             for term, defn in chunk["definitions"].items():
                 parts.append(f"  - {term}: {defn}")
+        if chunk.get("important_explanations"):
+            parts.append("Important Explanations:")
+            for explanation in chunk["important_explanations"]:
+                parts.append(f"  - {explanation}")
+        if chunk.get("examples"):
+            parts.append("Examples:")
+            for example in chunk["examples"]:
+                parts.append(f"  - {example}")
         parts.append(f"Summary: {chunk.get('summary', '')}")
+        parts.append(f"Confidence: {chunk.get('confidence', 'MEDIUM')}")
         parts.append("")
     return "\n".join(parts)

@@ -7,13 +7,25 @@ function formatSeconds(value) {
   return `${mins}:${String(secs).padStart(2, '0')}`;
 }
 
-function getChunkTimingLabel(chunk) {
+function getChunkBounds(chunk) {
+  const explicitStart = chunk?.chunk_start_sec;
+  const explicitEnd = chunk?.chunk_end_sec;
+  if (typeof explicitStart === 'number' && typeof explicitEnd === 'number' && explicitEnd >= explicitStart) {
+    return { start: explicitStart, end: explicitEnd };
+  }
+
   const segments = Array.isArray(chunk?.segments) ? chunk.segments : [];
-  if (!segments.length) return '';
+  if (!segments.length) return null;
   const start = segments[0]?.start;
   const end = segments[segments.length - 1]?.end;
-  if (typeof start !== 'number' || typeof end !== 'number') return '';
-  return `${formatSeconds(start)} - ${formatSeconds(end)}`;
+  if (typeof start !== 'number' || typeof end !== 'number') return null;
+  return { start, end };
+}
+
+function getChunkTimingLabel(chunk) {
+  const bounds = getChunkBounds(chunk);
+  if (!bounds) return '';
+  return `${formatSeconds(bounds.start)} - ${formatSeconds(bounds.end)}`;
 }
 
 export default function TranscriptPreview({ sessionData, onApprove, onBack }) {
@@ -37,15 +49,11 @@ export default function TranscriptPreview({ sessionData, onApprove, onBack }) {
   const transcriptWordCount = fullTranscript ? fullTranscript.split(/\s+/).length : 0;
 
   const totalDurationSeconds = useMemo(
-    () =>
-      chunks.reduce((acc, chunk) => {
-        const segments = Array.isArray(chunk?.segments) ? chunk.segments : [];
-        if (!segments.length) return acc;
-        const start = segments[0]?.start;
-        const end = segments[segments.length - 1]?.end;
-        if (typeof start !== 'number' || typeof end !== 'number') return acc;
-        return acc + Math.max(0, end - start);
-      }, 0),
+    () => chunks.reduce((acc, chunk) => {
+      const bounds = getChunkBounds(chunk);
+      if (!bounds) return acc;
+      return acc + Math.max(0, bounds.end - bounds.start);
+    }, 0),
     [chunks]
   );
 
