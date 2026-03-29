@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar.jsx';
 import HomePage from './pages/HomePage.jsx';
 import NotesPage from './pages/NotesPage.jsx';

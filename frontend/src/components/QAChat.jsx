@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+﻿import { useState, useRef, useEffect } from 'react';
 
 const SUGGESTED = [
   'What are the main topics covered in this lecture?',
@@ -8,7 +8,10 @@ const SUGGESTED = [
 
 export default function QAChat({ sessionId }) {
   const [messages, setMessages] = useState([
-    { role: 'assistant', content: '👋 Hi! Ask me anything about this lecture. My answers are grounded in the actual transcript.' },
+    {
+      role: 'assistant',
+      content: 'Ask any question about this lecture. Responses are grounded in the transcript context.',
+    },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,25 +45,24 @@ export default function QAChat({ sessionId }) {
         },
       ]);
     } catch (err) {
-      setMessages((prev) => [...prev, { role: 'assistant', content: `⚠️ ${err.message}` }]);
+      setMessages((prev) => [...prev, { role: 'assistant', content: `Error: ${err.message}` }]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleKey = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
+  const handleKey = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  };
 
   return (
     <div className="card qa-container" style={{ padding: 0, overflow: 'hidden' }}>
-      {/* Suggested questions */}
       <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         {SUGGESTED.map((s) => (
-          <button
-            key={s}
-            className="btn btn-secondary btn-sm"
-            style={{ fontSize: '0.78rem' }}
-            onClick={() => sendMessage(s)}
-          >
+          <button key={s} className="btn btn-secondary btn-sm" style={{ fontSize: '0.78rem' }} onClick={() => sendMessage(s)}>
             {s}
           </button>
         ))}
@@ -71,13 +73,13 @@ export default function QAChat({ sessionId }) {
           <div key={i} className={`message ${msg.role}`}>
             {msg.content}
             {msg.sources && (
-              <div className="source-label">📚 Based on {msg.sources} transcript chunk{msg.sources > 1 ? 's' : ''}</div>
+              <div className="source-label">Based on {msg.sources} transcript chunk{msg.sources > 1 ? 's' : ''}</div>
             )}
           </div>
         ))}
         {loading && (
           <div className="message assistant">
-            <span style={{ letterSpacing: 4, animation: 'pulse 1s infinite' }}>···</span>
+            <span style={{ letterSpacing: 4, animation: 'pulse 1s infinite' }}>...</span>
           </div>
         )}
         <div ref={messagesEndRef} />
@@ -87,7 +89,7 @@ export default function QAChat({ sessionId }) {
         <input
           id="qa-input"
           className="qa-input"
-          placeholder="Ask about this lecture…"
+          placeholder="Ask about this lecture..."
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKey}
