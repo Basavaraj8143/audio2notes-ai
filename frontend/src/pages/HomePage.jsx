@@ -225,12 +225,13 @@ export default function HomePage({ onSessionReady }) {
     setDoneSteps([]);
     setError('');
     setActiveStep('upload');
+    let stepInterval = null;
 
     try {
       const formData = new FormData();
       formData.append('file', file);
 
-      const stepInterval = setInterval(() => {
+      stepInterval = setInterval(() => {
         setDoneSteps((prev) => {
           const nextIdx = prev.length;
           if (nextIdx < TRANSCRIBE_STEPS.length - 1) {
@@ -270,6 +271,8 @@ export default function HomePage({ onSessionReady }) {
       setError(err.message);
       setStatus('error');
       setActiveStep(null);
+    } finally {
+      if (stepInterval) clearInterval(stepInterval);
     }
   };
 

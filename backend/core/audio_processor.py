@@ -106,13 +106,22 @@ def split_audio_into_chunks(wav_path: str) -> list[dict]:
 async def preprocess_audio(file_bytes: bytes, filename: str) -> list[dict]:
     """Full async preprocessing pipeline: save -> convert -> chunk."""
     os.makedirs(settings.AUDIO_TEMP_DIR, exist_ok=True)
+    tmp_path = None
+    wav_path = None
     suffix = Path(filename).suffix
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False, dir=settings.AUDIO_TEMP_DIR) as f:
-        f.write(file_bytes)
-        tmp_path = f.name
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False, dir=settings.AUDIO_TEMP_DIR) as f:
+            f.write(file_bytes)
+            tmp_path = f.name
 
-    loop = asyncio.get_event_loop()
-    wav_path = await loop.run_in_executor(None, convert_to_standard_format, tmp_path)
-    chunk_items = await loop.run_in_executor(None, split_audio_into_chunks, wav_path)
-    os.unlink(tmp_path)
-    return chunk_items
+        loop = asyncio.get_event_loop()
+        wav_path = await loop.run_in_executor(None, convert_to_standard_format, tmp_path)
+        chunk_items = await loop.run_in_executor(None, split_audio_into_chunks, wav_path)
+        return chunk_items
+    finally:
+        for path in (tmp_path, wav_path):
+            if path and os.path.exists(path):
+                try:
+                    os.unlink(path)
+                except OSError:
+                    pass

@@ -9,6 +9,7 @@ from core.config import settings
 
 _whisper_model = None
 _nlp = None
+_spacy_unavailable = False
 
 # Keep this list conservative: removing semantic words like "like" hurts transcript quality.
 DISFLUENCY_WORDS = re.compile(r"\b(uh+|um+|hmm+|erm+|ah+|mm+)\b", re.IGNORECASE)
@@ -23,15 +24,13 @@ def _load_whisper():
 
 
 def _load_spacy():
-    global _nlp
-    if _nlp is None:
+    global _nlp, _spacy_unavailable
+    if _nlp is None and not _spacy_unavailable:
         try:
             _nlp = spacy.load("en_core_web_sm")
         except OSError:
-            import subprocess
-            import sys
-            subprocess.run([sys.executable, "-m", "spacy", "download", "en_core_web_sm"], check=True)
-            _nlp = spacy.load("en_core_web_sm")
+            # Avoid runtime network/download in request path; use regex fallback in cleaning.
+            _spacy_unavailable = True
     return _nlp
 
 
@@ -121,13 +120,22 @@ def clean_transcript(raw_text: str) -> str:
     text = _cleanup_disfluencies(raw_text)
 
     nlp = _load_spacy()
-    doc = nlp(text)
     sentences: list[str] = []
-    for sent in doc.sents:
-        s = _dedupe_clauses(sent.text.strip())
-        s = re.sub(r"\s{2,}", " ", s).strip()
-        if len(_normalize_for_match(s)) >= 10:
-            sentences.append(s)
+    if nlp is not None:
+        doc = nlp(text)
+        for sent in doc.sents:
+            s = _dedupe_clauses(sent.text.strip())
+            s = re.sub(r"\s{2,}", " ", s).strip()
+            if len(_normalize_for_match(s)) >= 10:
+                sentences.append(s)
+    else:
+        # Lightweight fallback when spaCy model is unavailable.
+        rough_sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if s.strip()]
+        for sent in rough_sentences:
+            s = _dedupe_clauses(sent.strip())
+            s = re.sub(r"\s{2,}", " ", s).strip()
+            if len(_normalize_for_match(s)) >= 10:
+                sentences.append(s)
 
     unique_sentences = remove_duplicates(sentences)
     cleaned = " ".join(unique_sentences).strip()

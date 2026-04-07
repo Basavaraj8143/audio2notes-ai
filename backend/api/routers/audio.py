@@ -24,6 +24,7 @@ async def upload_audio(file: UploadFile = File(...)):
     if ext not in allowed:
         raise HTTPException(status_code=400, detail=f"Unsupported format: {ext}")
 
+    chunk_paths: list[dict | str] = []
     try:
         file_bytes = await file.read()
 
@@ -47,12 +48,6 @@ async def upload_audio(file: UploadFile = File(...)):
             "merged_notes": None,
         }
 
-        # Clean up temp audio files
-        for chunk in chunk_paths:
-            path = chunk["path"] if isinstance(chunk, dict) else chunk
-            if os.path.exists(path):
-                os.unlink(path)
-
         return JSONResponse(
             status_code=200,
             content={
@@ -63,8 +58,20 @@ async def upload_audio(file: UploadFile = File(...)):
                 "status": "transcribed"
             },
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[upload_audio] Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail="Audio upload processing failed.")
+    finally:
+        # Always clean up chunk files if they were created.
+        for chunk in chunk_paths:
+            path = chunk["path"] if isinstance(chunk, dict) else chunk
+            if path and os.path.exists(path):
+                try:
+                    os.unlink(path)
+                except OSError:
+                    pass
 
 
 @router.post("/process")
@@ -113,8 +120,11 @@ async def process_transcription(request_data: dict = Body(...)):
                 "status": "completed"
             },
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[process_transcription] Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail="Transcription post-processing failed.")
 
 
 def _merge_notes(notes_chunks: list[dict]) -> str:

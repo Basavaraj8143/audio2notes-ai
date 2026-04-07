@@ -77,4 +77,5 @@ Answer:"""
     except KeyError:
         raise HTTPException(status_code=404, detail='Session RAG index not found.')
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"[ask_question] Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail='Q&A processing failed.')
