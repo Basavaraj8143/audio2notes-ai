@@ -8,6 +8,7 @@ from core.audio_processor import preprocess_audio
 from core.transcriber import transcribe_all_chunks
 from core.llm import generate_all_notes
 from core.rag import create_index
+from core.session_store import save_session
 from models.session import sessions
 
 router = APIRouter()
@@ -47,6 +48,7 @@ async def upload_audio(file: UploadFile = File(...)):
             "notes_chunks": None,
             "merged_notes": None,
         }
+        save_session(session_id, sessions[session_id])
 
         return JSONResponse(
             status_code=200,
@@ -109,6 +111,7 @@ async def process_transcription(request_data: dict = Body(...)):
             "merged_notes": merged_notes,
             "status": "completed"
         })
+        save_session(session_id, sessions[session_id])
 
         return JSONResponse(
             status_code=200,

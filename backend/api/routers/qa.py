@@ -4,9 +4,10 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from core.rag import search_index
+from core.rag import search_index, create_index
 from core.llm import _get_ollama_client, _mistral_chat, _openrouter_chat
 from core.config import settings
+from core.session_store import get_session
 from models.session import sessions
 
 router = APIRouter()
@@ -21,7 +22,21 @@ class QARequest(BaseModel):
 async def ask_question(req: QARequest):
     """RAG-based Q&A: retrieve relevant transcript chunks and answer grounded in lecture content."""
     if req.session_id not in sessions:
-        raise HTTPException(status_code=404, detail='Session not found.')
+        stored = get_session(req.session_id)
+        if not stored:
+            raise HTTPException(status_code=404, detail='Session not found.')
+        sessions[req.session_id] = {
+            "filename": stored["filename"],
+            "status": stored["status"],
+            "transcript_chunks": stored["transcript_chunks"],
+            "notes_chunks": stored["notes_chunks"],
+            "merged_notes": stored["merged_notes"],
+        }
+
+    if "rag_index" not in sessions[req.session_id]:
+        transcript_chunks = sessions[req.session_id].get("transcript_chunks") or []
+        if transcript_chunks:
+            create_index(req.session_id, transcript_chunks)
 
     try:
         relevant_chunks = search_index(req.session_id, req.question, top_k=3)

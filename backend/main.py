@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.routers import audio, notes, qa, export
+from core.session_store import init_session_store
 
 app = FastAPI(
     title="Audio2Notes AI API",
@@ -20,6 +21,11 @@ app.include_router(audio.router, prefix="/api/v1/audio", tags=["Audio"])
 app.include_router(notes.router, prefix="/api/v1/notes", tags=["Notes"])
 app.include_router(qa.router, prefix="/api/v1/qa", tags=["Q&A"])
 app.include_router(export.router, prefix="/api/v1/export", tags=["Export"])
+
+
+@app.on_event("startup")
+async def _startup() -> None:
+    init_session_store()
 
 
 @app.get("/")

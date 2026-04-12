@@ -1,5 +1,4 @@
 import io
-import textwrap
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -10,6 +9,7 @@ from reportlab.lib import colors
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, HRFlowable
 from docx import Document
 
+from core.session_store import get_session
 from models.session import sessions
 
 router = APIRouter()
@@ -19,8 +19,20 @@ router = APIRouter()
 async def export_pdf(session_id: str):
     """Export notes as a formatted PDF."""
     if session_id not in sessions:
-        raise HTTPException(status_code=404, detail="Session not found.")
+        stored = get_session(session_id)
+        if not stored:
+            raise HTTPException(status_code=404, detail="Session not found.")
+        sessions[session_id] = {
+            "filename": stored["filename"],
+            "status": stored["status"],
+            "transcript_chunks": stored["transcript_chunks"],
+            "notes_chunks": stored["notes_chunks"],
+            "merged_notes": stored["merged_notes"],
+        }
     data = sessions[session_id]
+    if not data.get("notes_chunks"):
+        raise HTTPException(status_code=400, detail="Notes are not ready for export yet.")
+
     buf = io.BytesIO()
     _build_pdf(buf, data)
     buf.seek(0)
@@ -35,8 +47,20 @@ async def export_pdf(session_id: str):
 async def export_docx(session_id: str):
     """Export notes as a formatted DOCX."""
     if session_id not in sessions:
-        raise HTTPException(status_code=404, detail="Session not found.")
+        stored = get_session(session_id)
+        if not stored:
+            raise HTTPException(status_code=404, detail="Session not found.")
+        sessions[session_id] = {
+            "filename": stored["filename"],
+            "status": stored["status"],
+            "transcript_chunks": stored["transcript_chunks"],
+            "notes_chunks": stored["notes_chunks"],
+            "merged_notes": stored["merged_notes"],
+        }
     data = sessions[session_id]
+    if not data.get("notes_chunks"):
+        raise HTTPException(status_code=400, detail="Notes are not ready for export yet.")
+
     buf = io.BytesIO()
     _build_docx(buf, data)
     buf.seek(0)
@@ -51,8 +75,21 @@ async def export_docx(session_id: str):
 async def export_txt(session_id: str):
     """Export notes as plain text."""
     if session_id not in sessions:
-        raise HTTPException(status_code=404, detail="Session not found.")
-    text = sessions[session_id]["merged_notes"]
+        stored = get_session(session_id)
+        if not stored:
+            raise HTTPException(status_code=404, detail="Session not found.")
+        sessions[session_id] = {
+            "filename": stored["filename"],
+            "status": stored["status"],
+            "transcript_chunks": stored["transcript_chunks"],
+            "notes_chunks": stored["notes_chunks"],
+            "merged_notes": stored["merged_notes"],
+        }
+
+    text = sessions[session_id].get("merged_notes")
+    if not text:
+        raise HTTPException(status_code=400, detail="Notes are not ready for export yet.")
+
     return StreamingResponse(
         io.BytesIO(text.encode("utf-8")),
         media_type="text/plain",

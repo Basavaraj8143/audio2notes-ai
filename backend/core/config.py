@@ -45,6 +45,9 @@ class Settings(BaseSettings):
     FAISS_INDEX_DIR: str = 'faiss_index'
     EMBEDDING_MODEL: str = 'all-MiniLM-L6-v2'
 
+    # Persistent session storage
+    SESSION_DB_PATH: str = str(Path(__file__).resolve().parents[1] / 'session_store.db')
+
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),
         env_file_encoding='utf-8',
