@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      target: backend
+    ports:
+      - "8000:8000"
+    environment:
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - WHISPER_MODEL_SIZE=base
+      - AUDIO_SAMPLE_RATE=16000
+      - AUDIO_TEMP_DIR=temp_audio
+      - FAISS_INDEX_DIR=faiss_index
+    volumes:
+      - ./temp_audio:/app/temp_audio
+      - ./faiss_index:/app/faiss_index
+      - ./session_store.db:/app/session_store.db
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: .
+      target: frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  temp_audio:
+  faiss_index:

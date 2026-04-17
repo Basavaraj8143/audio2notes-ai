@@ -1,7 +1,7 @@
 ﻿"""API router for audio upload and step-by-step transcription pipeline."""
 import os
 import uuid
-from fastapi import APIRouter, UploadFile, File, HTTPException, Body
+from fastapi import APIRouter, UploadFile, File, HTTPException, Body, Request
 from fastapi.responses import JSONResponse
 
 from core.audio_processor import preprocess_audio
@@ -13,13 +13,25 @@ from models.session import sessions
 
 router = APIRouter()
 
+# Production limits
+MAX_UPLOAD_SIZE = 100 * 1024 * 1024  # 100MB
+
 
 @router.post("/upload")
-async def upload_audio(file: UploadFile = File(...)):
+async def upload_audio(request: Request, file: UploadFile = File(...)):
     """
     Step 1: Upload audio -> preprocess -> transcribe -> clean.
     Returns session_id and transcript for user approval.
     """
+    # Validate file size
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > MAX_UPLOAD_SIZE:
+        raise HTTPException(status_code=413, detail="File too large. Max size is 100MB.")
+    
+    # Validate filename and extension
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided.")
+        
     allowed = {".mp3", ".wav", ".m4a", ".ogg", ".flac"}
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in allowed:
@@ -28,6 +40,13 @@ async def upload_audio(file: UploadFile = File(...)):
     chunk_paths: list[dict | str] = []
     try:
         file_bytes = await file.read()
+        
+        # Double-check file size after reading
+        if len(file_bytes) > MAX_UPLOAD_SIZE:
+            raise HTTPException(status_code=413, detail="File too large. Max size is 100MB.")
+        
+        if len(file_bytes) == 0:
+            raise HTTPException(status_code=400, detail="Empty file uploaded.")
 
         # Generate session ID
         session_id = str(uuid.uuid4())
@@ -63,8 +82,9 @@ async def upload_audio(file: UploadFile = File(...)):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[upload_audio] Unexpected error: {e}")
-        raise HTTPException(status_code=500, detail="Audio upload processing failed.")
+        # Log error but don't expose details to client
+        print(f"[upload_audio] Processing failed: {type(e).__name__}")
+        raise HTTPException(status_code=500, detail="Audio processing failed. Please try again.")
     finally:
         # Always clean up chunk files if they were created.
         for chunk in chunk_paths:
@@ -126,8 +146,9 @@ async def process_transcription(request_data: dict = Body(...)):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[process_transcription] Unexpected error: {e}")
-        raise HTTPException(status_code=500, detail="Transcription post-processing failed.")
+        # Log error but don't expose details to client
+        print(f"[process_transcription] Processing failed: {type(e).__name__}")
+        raise HTTPException(status_code=500, detail="Note generation failed. Please try again.")
 
 
 def _merge_notes(notes_chunks: list[dict]) -> str:

@@ -306,7 +306,7 @@ export default function HomePage({ onSessionReady }) {
 
       setStatus('completed');
       onSessionReady(data);
-      setTimeout(() => navigate('/results'), 800);
+      setTimeout(() => navigate(`/results/${data.session_id}`), 800);
     } catch (err) {
       setError(err.message);
       setStatus('error');

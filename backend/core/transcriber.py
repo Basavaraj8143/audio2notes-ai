@@ -29,9 +29,18 @@ def _load_spacy():
         try:
             _nlp = spacy.load("en_core_web_sm")
         except OSError:
-            # Avoid runtime network/download in request path; use regex fallback in cleaning.
+            # Model not available - use regex fallback
             _spacy_unavailable = True
     return _nlp
+
+
+def check_spacy_model():
+    """Check if spaCy model is available at startup."""
+    try:
+        spacy.load("en_core_web_sm")
+        return True
+    except OSError:
+        return False
 
 
 def transcribe_chunk(chunk_path: str) -> dict:

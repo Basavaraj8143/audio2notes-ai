@@ -1,18 +1,96 @@
-﻿import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+﻿import { useEffect, useMemo, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import QAChat from '../components/QAChat.jsx';
 
-export default function NotesPage({ session }) {
+export default function NotesPage({ session, onSessionReady }) {
   const navigate = useNavigate();
+  const { sessionId } = useParams();
   const [activeTab, setActiveTab] = useState('notes');
+  const [loadedSession, setLoadedSession] = useState(session || null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!session) navigate('/');
-  }, [session, navigate]);
+    if (session && (!sessionId || session.session_id === sessionId)) {
+      setLoadedSession(session);
+    }
+  }, [session, sessionId]);
 
-  if (!session) return null;
+  useEffect(() => {
+    let mounted = true;
 
-  const { session_id, filename, notes = [], chunk_count } = session;
+    const fetchSession = async () => {
+      if (!sessionId) {
+        if (!session) navigate('/history');
+        return;
+      }
+
+      if (session && session.session_id === sessionId) {
+        setLoadedSession(session);
+        return;
+      }
+
+      setLoading(true);
+      setError('');
+      try {
+        const res = await fetch(`/api/v1/notes/${sessionId}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Failed to load session notes');
+
+        const normalized = {
+          session_id: data.session_id,
+          filename: data.filename,
+          notes: data.notes || [],
+          chunk_count: Array.isArray(data.notes) ? data.notes.length : 0,
+        };
+
+        if (mounted) {
+          setLoadedSession(normalized);
+          if (onSessionReady) onSessionReady(normalized);
+        }
+      } catch (err) {
+        if (mounted) setError(err.message || 'Failed to load session notes');
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    fetchSession();
+
+    return () => {
+      mounted = false;
+    };
+  }, [sessionId, session, onSessionReady, navigate]);
+
+  const effectiveSession = loadedSession;
+
+  const highConfidenceCount = useMemo(
+    () => (effectiveSession?.notes || []).filter((n) => n.confidence === 'HIGH').length,
+    [effectiveSession]
+  );
+
+  if (loading) {
+    return (
+      <main className="container" style={{ paddingTop: 32, paddingBottom: 60 }}>
+        <p style={{ color: 'var(--text-secondary)' }}>Loading notes...</p>
+      </main>
+    );
+  }
+
+  if (error) {
+    return (
+      <main className="container" style={{ paddingTop: 32, paddingBottom: 60 }}>
+        <p style={{ color: 'var(--danger-600)' }}>{error}</p>
+        <button className="btn btn-secondary" onClick={() => navigate('/history')}>Back to History</button>
+      </main>
+    );
+  }
+
+  if (!effectiveSession) {
+    return null;
+  }
+
+  const { session_id, filename, notes = [], chunk_count = notes.length } = effectiveSession;
 
   const handleExport = (format) => {
     window.open(`/api/v1/export/${session_id}/${format}`, '_blank');
@@ -35,7 +113,7 @@ export default function NotesPage({ session }) {
           <div className="stat-label">Sections</div>
         </div>
         <div className="stat-card">
-          <div className="stat-number">{notes.filter((n) => n.confidence === 'HIGH').length}</div>
+          <div className="stat-number">{highConfidenceCount}</div>
           <div className="stat-label">High Confidence</div>
         </div>
       </div>

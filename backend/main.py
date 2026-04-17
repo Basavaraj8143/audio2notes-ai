@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.routers import audio, notes, qa, export
 from core.session_store import init_session_store
+from core.transcriber import check_spacy_model
 
 app = FastAPI(
     title="Audio2Notes AI API",
@@ -26,6 +27,11 @@ app.include_router(export.router, prefix="/api/v1/export", tags=["Export"])
 @app.on_event("startup")
 async def _startup() -> None:
     init_session_store()
+    
+    # Check spaCy model availability
+    if not check_spacy_model():
+        print("WARNING: spaCy English model not found. Transcript cleaning will use regex fallback.")
+        print("To install: python -m spacy download en_core_web_sm")
 
 
 @app.get("/")

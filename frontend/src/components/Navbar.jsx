@@ -14,6 +14,9 @@ function BrandMark() {
 export default function Navbar({ session }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const isHome = location.pathname === '/';
+  const isHistory = location.pathname === '/history';
+  const isResults = location.pathname.startsWith('/results');
 
   return (
     <nav className="navbar">
@@ -25,14 +28,13 @@ export default function Navbar({ session }) {
           </span>
         </div>
         <div className="navbar-links">
-          <button className={`nav-btn ${location.pathname === '/' ? 'active' : ''}`} onClick={() => navigate('/')}>
+          <button className={`nav-btn ${isHome ? 'active' : ''}`} onClick={() => navigate('/')}>
             Upload
           </button>
-          {session && (
-            <button className={`nav-btn ${location.pathname === '/results' ? 'active' : ''}`} onClick={() => navigate('/results')}>
-              Results
-            </button>
-          )}
+          <button className={`nav-btn ${isHistory ? 'active' : ''}`} onClick={() => navigate('/history')}>
+            History
+          </button>
+          {session && <button className={`nav-btn ${isResults ? 'active' : ''}`} onClick={() => navigate(`/results/${session.session_id}`)}>Results</button>}
           <a
             href="http://localhost:8000/docs"
             target="_blank"
