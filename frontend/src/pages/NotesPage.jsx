@@ -1,6 +1,7 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import QAChat from '../components/QAChat.jsx';
+import { apiUrl } from '../config/api.js';
 
 export default function NotesPage({ session, onSessionReady }) {
   const navigate = useNavigate();
@@ -33,7 +34,7 @@ export default function NotesPage({ session, onSessionReady }) {
       setLoading(true);
       setError('');
       try {
-        const res = await fetch(`/api/v1/notes/${sessionId}`);
+        const res = await fetch(apiUrl(`/api/v1/notes/${sessionId}`));
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Failed to load session notes');
 
@@ -93,7 +94,7 @@ export default function NotesPage({ session, onSessionReady }) {
   const { session_id, filename, notes = [], chunk_count = notes.length } = effectiveSession;
 
   const handleExport = (format) => {
-    window.open(`/api/v1/export/${session_id}/${format}`, '_blank');
+    window.open(apiUrl(`/api/v1/export/${session_id}/${format}`), '_blank');
   };
 
   return (

@@ -1,6 +1,7 @@
-﻿import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import TranscriptPreview from '../components/TranscriptPreview.jsx';
+import { API_DOCS_URL, apiUrl } from '../config/api.js';
 
 function PipelineUploadIcon() {
   return (
@@ -242,7 +243,7 @@ export default function HomePage({ onSessionReady }) {
         });
       }, 2000);
 
-      const res = await fetch('/api/v1/audio/upload', { method: 'POST', body: formData });
+      const res = await fetch(apiUrl('/api/v1/audio/upload'), { method: 'POST', body: formData });
       clearInterval(stepInterval);
 
       if (!res.ok) {
@@ -280,7 +281,7 @@ export default function HomePage({ onSessionReady }) {
     if (!sessionData) return;
 
     try {
-      const res = await fetch('/api/v1/audio/process', {
+      const res = await fetch(apiUrl('/api/v1/audio/process'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionData.session_id }),
@@ -339,7 +340,7 @@ export default function HomePage({ onSessionReady }) {
             </p>
             <div className="hero-actions">
               <button className="btn btn-primary" onClick={jumpToUpload}>Start With Audio Upload</button>
-              <a href="http://localhost:8000/docs" target="_blank" rel="noreferrer" className="btn btn-secondary">
+              <a href={API_DOCS_URL} target="_blank" rel="noreferrer" className="btn btn-secondary">
                 View API Documentation
               </a>
             </div>
@@ -476,7 +477,7 @@ export default function HomePage({ onSessionReady }) {
             <p className="footer-brand">Audio2Notes.ai</p>
             <p className="footer-subtext">Lecture intelligence workflow for teams and institutions.</p>
           </div>
-          <a href="http://localhost:8000/docs" target="_blank" rel="noreferrer" className="footer-link">
+          <a href={API_DOCS_URL} target="_blank" rel="noreferrer" className="footer-link">
             API Docs
           </a>
         </div>

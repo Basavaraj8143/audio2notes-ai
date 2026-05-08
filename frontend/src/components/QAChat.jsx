@@ -1,4 +1,5 @@
-﻿import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { apiUrl } from '../config/api.js';
 
 const SUGGESTED = [
   'What are the main topics covered in this lecture?',
@@ -29,7 +30,7 @@ export default function QAChat({ sessionId }) {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/v1/qa/ask', {
+      const res = await fetch(apiUrl('/api/v1/qa/ask'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId, question: q }),

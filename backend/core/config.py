@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     OPENROUTER_APP_TITLE: str = 'Audio2Notes AI'
     OPENROUTER_FREE_ONLY: bool = True
 
+    # CORS
+    CORS_ORIGINS: str = 'http://localhost:5173,http://localhost:3000'
+    CORS_ORIGIN_REGEX: str = r'https://.*\.vercel\.app'
+
     # Optional local Ollama fallback
     OLLAMA_BASE_URL: str = 'http://localhost:11434'
     OLLAMA_MODEL: str = 'llama2:latest'
@@ -56,3 +60,7 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+
+def get_cors_origins() -> list[str]:
+    return [origin.strip() for origin in settings.CORS_ORIGINS.split(',') if origin.strip()]

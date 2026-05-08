@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { apiUrl } from '../config/api.js';
 
 function formatDate(value) {
   if (!value) return 'Unknown';
@@ -20,7 +21,7 @@ export default function HistoryPage() {
       setLoading(true);
       setError('');
       try {
-        const res = await fetch('/api/v1/notes/history?limit=50');
+        const res = await fetch(apiUrl('/api/v1/notes/history?limit=50'));
         const data = await res.json();
         if (!res.ok) throw new Error(data.detail || 'Failed to load history');
         if (mounted) setItems(Array.isArray(data.items) ? data.items : []);
@@ -76,4 +77,3 @@ export default function HistoryPage() {
     </main>
   );
 }
-

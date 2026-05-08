@@ -79,12 +79,14 @@ The current workflow is review-first: users upload audio, inspect the transcript
 |   |   |-- config/
 |   |   `-- pages/
 |   |-- package.json
+|   |-- vercel.json
 |   `-- vite.config.js
 |-- .env.example
 |-- DEPLOYMENT.md
 |-- PROJECT_REPORT_REFERENCE.md
 |-- implementation_plan.md
-`-- improvements.md
+|-- improvements.md
+`-- render.yaml
 ```
 
 ## Prerequisites
@@ -158,6 +160,41 @@ Frontend URL:
 
 - `http://127.0.0.1:5173`
 
+## Deploying to Vercel + Render
+
+This repo is prepared for:
+
+- **Frontend** on Vercel
+- **Backend** on Render
+
+### Vercel
+
+- Set the Vercel project root to `frontend`
+- Keep the framework preset as Vite
+- Set:
+  - `VITE_API_BASE_URL=https://your-render-service.onrender.com`
+  - `VITE_API_DOCS_URL=https://your-render-service.onrender.com/docs`
+
+### Render
+
+- Deploy the `backend` folder as a Python web service
+- Use:
+  - build command:
+    `pip install -r requirements.txt && pip install openai-whisper && python -m spacy download en_core_web_sm`
+  - start command:
+    `python -m uvicorn main:app --host 0.0.0.0 --port $PORT`
+- Set:
+  - `CORS_ORIGINS=https://your-frontend.vercel.app`
+  - `OPENROUTER_HTTP_REFERER=https://your-frontend.vercel.app`
+  - your API keys
+
+The repository also includes [render.yaml](D:/projects/audio2notes-ai/render.yaml:1) for Render Blueprint setup and [frontend/vercel.json](D:/projects/audio2notes-ai/frontend/vercel.json:1) for SPA rewrites.
+
+Important note:
+
+- Render free web services use an ephemeral filesystem, so local SQLite and on-disk artifacts are not durable there
+- for persistent local storage on Render, use a paid web service with a persistent disk
+
 ## Environment Variables
 
 Environment is loaded by `backend/core/config.py` and the frontend Vite config.
@@ -177,6 +214,11 @@ Environment is loaded by `backend/core/config.py` and the frontend Vite config.
 - `OPENROUTER_FREE_ONLY`
 - `OLLAMA_BASE_URL`
 - `OLLAMA_MODEL`
+
+#### CORS
+
+- `CORS_ORIGINS`
+- `CORS_ORIGIN_REGEX`
 
 #### Audio and chunking
 
@@ -293,6 +335,13 @@ Make sure:
 - backend is running on `127.0.0.1:8000`
 - frontend `.env` points `VITE_API_BASE_URL` to the correct backend URL if you are not relying on the dev proxy
 
+### CORS errors after Vercel + Render deployment
+
+Check that:
+
+- Render `CORS_ORIGINS` includes your Vercel production URL
+- the backend was redeployed after changing env vars
+
 ### Long processing times for large files
 
 This is expected for long lectures because:
@@ -307,11 +356,12 @@ This is expected for long lectures because:
 - Note generation is sequential and can be slow for large lectures
 - FAISS indexes live in memory and may need to be rebuilt after restart
 - No concept graph feature is currently implemented
+- Render free deployments do not provide durable local filesystem storage
 - Automated tests are still limited
 
 ## Additional Docs
 
-- [DEPLOYMENT.md](D:/projects/audio2notes-ai/DEPLOYMENT.md:1): non-Docker deployment notes
+- [DEPLOYMENT.md](D:/projects/audio2notes-ai/DEPLOYMENT.md:1): Vercel + Render deployment walkthrough
 - [PROJECT_REPORT_REFERENCE.md](D:/projects/audio2notes-ai/PROJECT_REPORT_REFERENCE.md:1): detailed report-ready explanation of the project
 - [implementation_plan.md](D:/projects/audio2notes-ai/implementation_plan.md:1): original implementation plan
 - [improvements.md](D:/projects/audio2notes-ai/improvements.md:1): future fixes and enhancement ideas

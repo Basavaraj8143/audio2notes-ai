@@ -1,4 +1,5 @@
-﻿import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { API_DOCS_URL } from '../config/api.js';
 
 function BrandMark() {
   return (
@@ -36,7 +37,7 @@ export default function Navbar({ session }) {
           </button>
           {session && <button className={`nav-btn ${isResults ? 'active' : ''}`} onClick={() => navigate(`/results/${session.session_id}`)}>Results</button>}
           <a
-            href="http://localhost:8000/docs"
+            href={API_DOCS_URL}
             target="_blank"
             rel="noreferrer"
             className="nav-btn"
