@@ -1,14 +1,13 @@
 import asyncio
 import re
 
-import spacy
-import whisper
 from rapidfuzz import fuzz
 
 from core.config import settings
 
 _whisper_model = None
-_nlp = None
+_spacy_module = None
+_spacy_nlp = None
 _spacy_unavailable = False
 
 # Keep this list conservative: removing semantic words like "like" hurts transcript quality.
@@ -16,27 +15,43 @@ DISFLUENCY_WORDS = re.compile(r"\b(uh+|um+|hmm+|erm+|ah+|mm+)\b", re.IGNORECASE)
 DISFLUENCY_PHRASES = re.compile(r"\b(you know|i mean)\b", re.IGNORECASE)
 
 
+def _get_spacy_module():
+    global _spacy_module
+    if _spacy_module is None:
+        import spacy
+        _spacy_module = spacy
+    return _spacy_module
+
+
+def _get_whisper_module():
+    import whisper
+    return whisper
+
+
 def _load_whisper():
     global _whisper_model
     if _whisper_model is None:
+        whisper = _get_whisper_module()
         _whisper_model = whisper.load_model(settings.WHISPER_MODEL_SIZE)
     return _whisper_model
 
 
 def _load_spacy():
-    global _nlp, _spacy_unavailable
-    if _nlp is None and not _spacy_unavailable:
+    global _spacy_nlp, _spacy_unavailable
+    if _spacy_nlp is None and not _spacy_unavailable:
         try:
-            _nlp = spacy.load("en_core_web_sm")
+            spacy = _get_spacy_module()
+            _spacy_nlp = spacy.load("en_core_web_sm")
         except OSError:
             # Model not available - use regex fallback
             _spacy_unavailable = True
-    return _nlp
+    return _spacy_nlp
 
 
 def check_spacy_model():
     """Check if spaCy model is available at startup."""
     try:
+        spacy = _get_spacy_module()
         spacy.load("en_core_web_sm")
         return True
     except OSError:
@@ -155,7 +170,7 @@ async def transcribe_all_chunks(chunk_paths: list[dict | str]) -> list[dict]:
     """Transcribe all audio chunks sequentially to avoid CPU/RAM overload."""
     loop = asyncio.get_event_loop()
     cleaned = []
-    
+
     for i, chunk in enumerate(chunk_paths):
         path = chunk["path"] if isinstance(chunk, dict) else chunk
         chunk_start_sec = float(chunk.get("start_sec", 0)) if isinstance(chunk, dict) else 0.0

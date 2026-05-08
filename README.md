@@ -187,6 +187,7 @@ This repo is prepared for:
   - `CORS_ORIGINS=https://your-frontend.vercel.app`
   - `OPENROUTER_HTTP_REFERER=https://your-frontend.vercel.app`
   - your API keys
+- On Render free, prefer `WHISPER_MODEL_SIZE=tiny` to reduce memory pressure
 
 The repository also includes [render.yaml](D:/projects/audio2notes-ai/render.yaml:1) for Render Blueprint setup and [frontend/vercel.json](D:/projects/audio2notes-ai/frontend/vercel.json:1) for SPA rewrites.
 

@@ -1,11 +1,9 @@
-﻿import asyncio
+import asyncio
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from core.rag import search_index, create_index
-from core.llm import _get_ollama_client, _mistral_chat, _openrouter_chat
 from core.config import settings
 from core.session_store import get_session
 from models.session import sessions
@@ -21,6 +19,9 @@ class QARequest(BaseModel):
 @router.post('/ask')
 async def ask_question(req: QARequest):
     """RAG-based Q&A: retrieve relevant transcript chunks and answer grounded in lecture content."""
+    from core.rag import search_index, create_index
+    from core.llm import _get_ollama_client, _mistral_chat, _openrouter_chat
+
     if req.session_id not in sessions:
         stored = get_session(req.session_id)
         if not stored:

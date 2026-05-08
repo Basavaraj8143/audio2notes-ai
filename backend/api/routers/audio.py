@@ -1,13 +1,9 @@
-﻿"""API router for audio upload and step-by-step transcription pipeline."""
+"""API router for audio upload and step-by-step transcription pipeline."""
 import os
 import uuid
 from fastapi import APIRouter, UploadFile, File, HTTPException, Body, Request
 from fastapi.responses import JSONResponse
 
-from core.audio_processor import preprocess_audio
-from core.transcriber import transcribe_all_chunks
-from core.llm import generate_all_notes
-from core.rag import create_index
 from core.session_store import save_session
 from models.session import sessions
 
@@ -23,15 +19,18 @@ async def upload_audio(request: Request, file: UploadFile = File(...)):
     Step 1: Upload audio -> preprocess -> transcribe -> clean.
     Returns session_id and transcript for user approval.
     """
+    from core.audio_processor import preprocess_audio
+    from core.transcriber import transcribe_all_chunks
+
     # Validate file size
     content_length = request.headers.get("content-length")
     if content_length and int(content_length) > MAX_UPLOAD_SIZE:
         raise HTTPException(status_code=413, detail="File too large. Max size is 100MB.")
-    
+
     # Validate filename and extension
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided.")
-        
+
     allowed = {".mp3", ".wav", ".m4a", ".ogg", ".flac"}
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in allowed:
@@ -40,11 +39,11 @@ async def upload_audio(request: Request, file: UploadFile = File(...)):
     chunk_paths: list[dict | str] = []
     try:
         file_bytes = await file.read()
-        
+
         # Double-check file size after reading
         if len(file_bytes) > MAX_UPLOAD_SIZE:
             raise HTTPException(status_code=413, detail="File too large. Max size is 100MB.")
-        
+
         if len(file_bytes) == 0:
             raise HTTPException(status_code=400, detail="Empty file uploaded.")
 
@@ -102,6 +101,9 @@ async def process_transcription(request_data: dict = Body(...)):
     Step 2: User approved transcript -> generate notes -> create RAG index.
     Takes session_id from step 1 and completes the pipeline.
     """
+    from core.llm import generate_all_notes
+    from core.rag import create_index
+
     session_id = request_data.get("session_id")
     if not session_id:
         raise HTTPException(status_code=400, detail="session_id is required")

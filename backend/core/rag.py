@@ -1,16 +1,15 @@
-import os
 import numpy as np
 import faiss
-from sentence_transformers import SentenceTransformer
 
 from core.config import settings
 
 _model = None
 
 
-def _get_model() -> SentenceTransformer:
+def _get_model():
     global _model
     if _model is None:
+        from sentence_transformers import SentenceTransformer
         _model = SentenceTransformer(settings.EMBEDDING_MODEL)
     return _model
 
@@ -33,10 +32,10 @@ def create_index(session_id: str, transcript_chunks: list[dict]) -> None:
 def search_index(session_id: str, query: str, top_k: int = 3) -> list[str]:
     """Embed the query and retrieve top-k most relevant transcript chunks."""
     from models.session import sessions
-    
+
     if session_id not in sessions or "rag_index" not in sessions[session_id]:
         raise KeyError(f"Session {session_id} not found or no RAG index available.")
-    
+
     model = _get_model()
     rag_data = sessions[session_id]["rag_index"]
     query_vec = model.encode([query], convert_to_numpy=True, normalize_embeddings=True).astype(np.float32)

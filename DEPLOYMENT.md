@@ -68,7 +68,7 @@ Set these in the Render dashboard:
 Usually you should also set:
 
 - `OPENROUTER_APP_TITLE=Audio2Notes AI`
-- `WHISPER_MODEL_SIZE=base`
+- `WHISPER_MODEL_SIZE=tiny` on Render free, or `base` on a larger instance
 
 #### Example Render values
 
