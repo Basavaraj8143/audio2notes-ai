@@ -1,147 +1,171 @@
-﻿# Audio2Notes AI
+# Audio2Notes AI
 
-Audio2Notes AI transforms lecture audio into structured study notes and provides grounded Q&A over the transcript.
-
-## Table of Contents
-- Overview
-- Features
-- Architecture
-- Tech Stack
-- Project Structure
-- Prerequisites
-- Quick Start (Local)
-- Environment Variables
-- API Endpoints
-- Usage Flow
-- Troubleshooting
-- Current Limitations
-- Roadmap
+Audio2Notes AI converts lecture audio into structured study notes and supports grounded Q&A over the transcript.
 
 ## Overview
-This project has two apps:
-- Backend: FastAPI service for audio processing, transcription, note generation, retrieval, and export
-- Frontend: React + Vite interface for upload, transcript review, notes, and Q&A
 
-## Features
-- Upload lecture audio (`.mp3`, `.wav`, `.m4a`, `.ogg`, `.flac`)
-- Whisper-based transcription with timeline-aware chunk metadata
-- Transcript cleaning (disfluency and duplicate reduction)
-- Structured notes generation (Mistral -> OpenRouter -> Ollama fallback)
-- Retrieval-augmented Q&A over transcript chunks
-- Export notes as PDF, DOCX, and TXT
+This project is a two-part application:
+
+- **Backend**: FastAPI service for audio preprocessing, transcription, note generation, retrieval, session persistence, and exports
+- **Frontend**: React + Vite interface for upload, transcript review, notes viewing, history, and Q&A
+
+The current workflow is review-first: users upload audio, inspect the transcript, and only then approve note generation.
+
+## Current Features
+
+- Upload lecture audio in `.mp3`, `.wav`, `.m4a`, `.ogg`, and `.flac`
+- Convert audio to mono 16 kHz WAV before transcription
+- Silence-aware chunking with timeline-preserving metadata
+- Whisper transcription for each chunk
+- Transcript cleanup with disfluency removal and duplicate reduction
 - Transcript approval step before note generation
+- Structured notes generation with provider fallback:
+  - Mistral
+  - OpenRouter
+  - Ollama
+- Grounded Q&A using FAISS retrieval over transcript chunks
+- Export notes as PDF, DOCX, and TXT
+- Session history for completed runs
+- SQLite-backed session persistence
 
 ## Architecture
-1. Upload audio file
-2. Convert to mono 16kHz WAV
-3. Silence-aware chunking with min/max duration rules
-4. Whisper transcription per chunk
-5. Transcript cleanup
-6. User reviews transcript
-7. LLM generates structured notes
-8. FAISS index built from cleaned chunks
-9. Q&A and export endpoints enabled
+
+1. User uploads an audio file from the frontend.
+2. Backend validates and temporarily stores the file.
+3. Audio is normalized to mono 16 kHz WAV.
+4. Audio is split into chunks using silence detection.
+5. Whisper transcribes each chunk.
+6. The transcript is cleaned and returned for review.
+7. User approves the transcript.
+8. An LLM generates structured notes for each chunk.
+9. A FAISS index is built from cleaned transcript chunks.
+10. Notes, exports, and grounded Q&A become available.
 
 ## Tech Stack
-- Backend: FastAPI, Uvicorn, pydantic-settings
-- Audio: librosa, pydub, soundfile, Whisper
-- NLP cleanup: spaCy, rapidfuzz
-- Notes/Q&A LLMs: Mistral API, OpenRouter, Ollama fallback
-- Retrieval: sentence-transformers, FAISS
-- Export: reportlab, python-docx
-- Frontend: React, React Router, Vite
+
+- **Backend**: FastAPI, Uvicorn, pydantic-settings
+- **Audio**: librosa, pydub, soundfile
+- **ASR**: Whisper
+- **Transcript cleanup**: spaCy, rapidfuzz
+- **LLM providers**: Mistral, OpenRouter, Ollama
+- **Retrieval**: sentence-transformers, FAISS
+- **Export**: reportlab, python-docx
+- **Frontend**: React, React Router, Vite
 
 ## Project Structure
+
 ```text
 .
-├── backend/
-│   ├── api/routers/
-│   │   ├── audio.py
-│   │   ├── notes.py
-│   │   ├── qa.py
-│   │   └── export.py
-│   ├── core/
-│   │   ├── audio_processor.py
-│   │   ├── transcriber.py
-│   │   ├── llm.py
-│   │   ├── rag.py
-│   │   └── config.py
-│   ├── models/session.py
-│   ├── main.py
-│   └── requirements.txt
-├── frontend/
-│   ├── src/
-│   ├── package.json
-│   └── vite.config.js
-├── .env
-├── .env.example
-└── improvements.md
+|-- backend/
+|   |-- api/routers/
+|   |   |-- audio.py
+|   |   |-- export.py
+|   |   |-- notes.py
+|   |   `-- qa.py
+|   |-- core/
+|   |   |-- audio_processor.py
+|   |   |-- config.py
+|   |   |-- llm.py
+|   |   |-- rag.py
+|   |   |-- session_store.py
+|   |   `-- transcriber.py
+|   |-- models/
+|   |   `-- session.py
+|   |-- main.py
+|   `-- requirements.txt
+|-- frontend/
+|   |-- src/
+|   |   |-- components/
+|   |   |-- config/
+|   |   `-- pages/
+|   |-- package.json
+|   `-- vite.config.js
+|-- .env.example
+|-- DEPLOYMENT.md
+|-- PROJECT_REPORT_REFERENCE.md
+|-- implementation_plan.md
+`-- improvements.md
 ```
 
 ## Prerequisites
+
 - Python 3.10+
 - Node.js 18+
 - npm 9+
-- FFmpeg (required by audio pipeline dependencies)
+- FFmpeg available on the machine
 
-## Quick Start (Local)
+## Quick Start
 
-### 1) Clone and create virtual environment
+### 1. Create a virtual environment
+
 ```powershell
-git clone <your-repo-url>
-cd audio2notes-ai
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 ```
 
-### 2) Install backend dependencies
+### 2. Install backend dependencies
+
 ```powershell
 pip install -r backend\requirements.txt
-```
-
-If Whisper is not installed from your requirements lock, install it explicitly:
-```powershell
 pip install openai-whisper
-```
-
-Install spaCy English model:
-```powershell
 python -m spacy download en_core_web_sm
 ```
 
-### 3) Configure environment
+### 3. Configure environment files
+
+Backend:
+
 ```powershell
 Copy-Item .env.example .env
 ```
-Update `.env` with at least one LLM provider key:
-- `MISTRAL_API_KEY` (recommended)
+
+Frontend:
+
+```powershell
+Copy-Item frontend\.env.example frontend\.env
+```
+
+At minimum, set one remote LLM provider key in `.env`:
+
+- `MISTRAL_API_KEY`
 - or `OPENROUTER_API_KEY`
 
-### 4) Start backend
+If both are missing, the app can still use Ollama if a local Ollama server is running and configured.
+
+### 4. Start the backend
+
 ```powershell
 cd backend
 ..\venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
 Backend URLs:
+
 - API root: `http://127.0.0.1:8000/`
 - Health: `http://127.0.0.1:8000/health`
 - Docs: `http://127.0.0.1:8000/docs`
 
-### 5) Start frontend
-Open a second terminal at repo root:
+### 5. Start the frontend
+
+From the repository root in a second terminal:
+
 ```powershell
 npm --prefix frontend install
 npm --prefix frontend run dev
 ```
 
 Frontend URL:
+
 - `http://127.0.0.1:5173`
 
 ## Environment Variables
-Defined in `.env.example` and loaded by `backend/core/config.py`.
 
-### Core LLM
+Environment is loaded by `backend/core/config.py` and the frontend Vite config.
+
+### Backend `.env`
+
+#### LLM providers
+
 - `MISTRAL_API_KEY`
 - `MISTRAL_MODEL`
 - `MISTRAL_BASE_URL`
@@ -154,7 +178,8 @@ Defined in `.env.example` and loaded by `backend/core/config.py`.
 - `OLLAMA_BASE_URL`
 - `OLLAMA_MODEL`
 
-### Audio + Chunking
+#### Audio and chunking
+
 - `WHISPER_MODEL_SIZE`
 - `AUDIO_SAMPLE_RATE`
 - `AUDIO_TEMP_DIR`
@@ -163,74 +188,130 @@ Defined in `.env.example` and loaded by `backend/core/config.py`.
 - `KEEP_SILENCE_MS`
 - `MIN_CHUNK_LEN_MS`
 - `MAX_CHUNK_LEN_MS`
+- `MAX_WORDS_PER_CHUNK`
 
-### Retrieval
+#### Retrieval and storage
+
 - `EMBEDDING_MODEL`
 - `FAISS_INDEX_DIR`
+- `SESSION_DB_PATH`
+
+### Frontend `frontend/.env`
+
+- `VITE_API_BASE_URL`
+- `VITE_API_DOCS_URL`
 
 ## API Endpoints
 
 ### Audio
+
 - `POST /api/v1/audio/upload`
-  - Upload and transcribe audio
-  - Returns `session_id`, `transcript_chunks`, and status `transcribed`
+  - Uploads audio, preprocesses it, transcribes it, and returns transcript data for review
 - `POST /api/v1/audio/process`
-  - Generate notes and create retrieval index from approved transcript
+  - Generates notes and builds the retrieval index for an approved transcript
 
 ### Notes
+
+- `GET /api/v1/notes/history`
+  - Returns recently completed sessions
 - `GET /api/v1/notes/{session_id}`
-  - Fetch structured notes and merged notes
+  - Returns structured notes for a session
 
 ### Q&A
+
 - `POST /api/v1/qa/ask`
-  - Ask grounded questions against lecture transcript context
+  - Answers questions grounded in retrieved transcript context
 
 ### Export
+
 - `GET /api/v1/export/{session_id}/pdf`
 - `GET /api/v1/export/{session_id}/docx`
 - `GET /api/v1/export/{session_id}/txt`
 
 ## Usage Flow
-1. Open frontend and upload audio
-2. Wait for transcription
-3. Review transcript in preview
-4. Approve to generate notes and index
-5. Open notes and use Q&A
-6. Export final notes
+
+1. Open the frontend and upload a lecture file.
+2. Wait for transcription to finish.
+3. Review the transcript in full or by segment.
+4. Approve the transcript.
+5. View generated notes.
+6. Ask grounded questions in the Q&A tab.
+7. Export results if needed.
+8. Reopen completed sessions from History later.
+
+## Notes on Implementation Scope
+
+The repository includes planning documents that mention concept graphs and broader future scope. Those items are not part of the current shipped implementation.
+
+Implemented today:
+
+- transcript processing
+- structured notes
+- retrieval-based Q&A
+- export
+- session history
+
+Still future scope:
+
+- concept graph generation
+- graph visualization
+- background job orchestration
+- fuller automated test coverage
 
 ## Troubleshooting
 
 ### `npm ERR! enoent ... package.json` at repo root
-Cause: `package.json` is under `frontend/`.
-Fix:
+
+The frontend `package.json` lives under `frontend/`.
+
+Use:
+
 ```powershell
 npm --prefix frontend run dev
 ```
+
 or:
+
 ```powershell
 cd frontend
 npm run dev
 ```
 
-### Backend shows `RequestsDependencyWarning`
-This is usually a version mismatch in `requests` dependency tree (`urllib3/chardet/charset_normalizer`).
-Fix by updating/pinning compatible versions in your Python environment.
+### Whisper or spaCy fails on first run
 
-### `spawn EPERM` while starting Vite
-This can happen in restricted shells/sandboxes. Run terminal with normal local permissions and retry.
+Install the missing pieces explicitly:
 
-### Whisper/spaCy errors on first run
-Install missing dependencies:
 ```powershell
 pip install openai-whisper
 python -m spacy download en_core_web_sm
 ```
 
-## Current Limitations
-- Session store is in-memory (non-persistent)
-- Long-running jobs are synchronous from user perspective (no background job queue)
-- Export endpoints assume processed notes exist
+### Vite cannot reach the backend
 
-## Roadmap
-Planned improvements are tracked in:
-- `improvements.md`
+Make sure:
+
+- backend is running on `127.0.0.1:8000`
+- frontend `.env` points `VITE_API_BASE_URL` to the correct backend URL if you are not relying on the dev proxy
+
+### Long processing times for large files
+
+This is expected for long lectures because:
+
+- audio is chunked and transcribed sequentially
+- note generation is also sequential
+- embeddings and retrieval index creation happen after approval
+
+## Current Limitations
+
+- Long-running tasks are synchronous from the user perspective
+- Note generation is sequential and can be slow for large lectures
+- FAISS indexes live in memory and may need to be rebuilt after restart
+- No concept graph feature is currently implemented
+- Automated tests are still limited
+
+## Additional Docs
+
+- [DEPLOYMENT.md](D:/projects/audio2notes-ai/DEPLOYMENT.md:1): non-Docker deployment notes
+- [PROJECT_REPORT_REFERENCE.md](D:/projects/audio2notes-ai/PROJECT_REPORT_REFERENCE.md:1): detailed report-ready explanation of the project
+- [implementation_plan.md](D:/projects/audio2notes-ai/implementation_plan.md:1): original implementation plan
+- [improvements.md](D:/projects/audio2notes-ai/improvements.md:1): future fixes and enhancement ideas
