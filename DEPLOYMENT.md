@@ -1,50 +1,54 @@
 # Production Deployment Guide
 
-## Quick Start with Docker
+## Recommended Setup
 
-1. **Copy environment file:**
-```bash
-cp .env.example .env
-# Edit .env with your API keys
-```
+This project runs as two separate services:
 
-2. **Build and run:**
-```bash
-docker-compose up -d
-```
+- Frontend: Vite build served from any static host
+- Backend: FastAPI served with Uvicorn on a Linux or Windows VM
 
-3. **Access the application:**
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- API Docs: http://localhost:8000/docs
+## Backend Deployment
+
+1. Copy the project to your server and create a virtual environment.
+2. Install backend dependencies from `backend/requirements.txt`.
+3. Install the spaCy English model:
+   `python -m spacy download en_core_web_sm`
+4. Copy `.env.example` to `.env` and set your API keys.
+5. Start the API from `backend/`:
+   `python -m uvicorn main:app --host 0.0.0.0 --port 8000`
+
+## Frontend Deployment
+
+1. Install dependencies in `frontend/`.
+2. Build the app with `npm run build`.
+3. Serve the generated `frontend/dist` folder with your preferred static host.
+4. Point the frontend API base URL at the deployed backend service.
 
 ## Production Considerations
 
 ### Required Environment Variables
-- `MISTRAL_API_KEY` - Primary LLM provider
-- `OPENROUTER_API_KEY` - Fallback LLM provider
+
+- `MISTRAL_API_KEY` for the primary LLM provider
+- `OPENROUTER_API_KEY` if you want the fallback provider enabled
 
 ### Security Notes
-- File uploads limited to 100MB
-- Audio files are automatically cleaned up
-- Error messages don't expose internal details
-- CORS restricted to localhost by default
+
+- File uploads are capped in the backend
+- Temporary audio files are cleaned up automatically
+- CORS should be restricted to your frontend origin before production use
 
 ### Monitoring
+
 - Health check endpoint: `/health`
-- Application logs available via `docker-compose logs`
+- Review Uvicorn or process-manager logs for runtime issues
 
 ### Scaling
-- Backend is stateful (SQLite sessions)
-- For horizontal scaling, replace SQLite with PostgreSQL
-- Add Redis for session storage in multi-instance deployments
 
-## Critical Fixes Applied
+- The default session store is file-based and best suited for a single instance
+- For horizontal scaling, move sessions and indexes to shared infrastructure
 
-1. **Error Handling** - No more raw exception exposure
-2. **Upload Security** - Size limits and validation
-3. **File Cleanup** - Guaranteed temp file removal
-4. **spaCy Model** - Startup check instead of runtime download
-5. **Containerization** - Full Docker setup with nginx reverse proxy
+## Suggested Production Stack
 
-Your application is now production-ready for single-instance deployment.
+- `uvicorn` behind a process manager such as `systemd`, `pm2`, or NSSM
+- A reverse proxy such as Nginx, Caddy, or your platform's built-in gateway
+- Persistent storage for uploaded audio, indexes, and any session database you keep
