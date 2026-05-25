@@ -37,7 +37,7 @@ export const uploadAudioFile = async (fileUri: string, filename: string): Promis
   const data = await request<any>('/api/v1/audio/upload', {
     method: 'POST',
     body: formData,
-    timeoutMs: 120000,
+    timeoutMs: 300000,
   });
 
   // Backend returns 'transcript_chunks' after upload
@@ -56,7 +56,7 @@ export const processSession = async (sessionId: string): Promise<Session> => {
   const data = await request<any>('/api/v1/audio/process', {
     method: 'POST',
     body: { session_id: sessionId },
-    timeoutMs: 90000,
+    timeoutMs: 180000,
   });
 
   // Backend returns 'notes' (not 'notes_chunks')

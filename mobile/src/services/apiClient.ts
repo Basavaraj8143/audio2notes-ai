@@ -1,10 +1,28 @@
+import Constants from 'expo-constants';
 import { Platform } from 'react-native';
+
+const DEFAULT_API_PORT = '8000';
+
+const getExpoHostBaseUrl = () => {
+  const hostUri = Constants.expoConfig?.hostUri || Constants.platform?.hostUri;
+  if (!hostUri) return null;
+
+  const host = hostUri.split(':')[0];
+  if (!host || host === 'localhost' || host === '127.0.0.1') return null;
+
+  return `http://${host}:${DEFAULT_API_PORT}`;
+};
 
 // Default base URL depending on platform
 // - iOS Simulator: localhost
 // - Android Emulator: 10.0.2.2
 // - Real device: requires local LAN IP (e.g. http://192.168.1.X:8000)
 const getDefaultBaseUrl = () => {
+  const expoHostBaseUrl = getExpoHostBaseUrl();
+  if (expoHostBaseUrl) {
+    return expoHostBaseUrl;
+  }
+
   if (Platform.OS === 'android') {
     return 'http://10.0.2.2:8000';
   }
@@ -14,6 +32,7 @@ const getDefaultBaseUrl = () => {
 let apiBaseUrl = getDefaultBaseUrl();
 
 export const getApiBaseUrl = () => apiBaseUrl;
+export const getSuggestedApiBaseUrl = () => getDefaultBaseUrl();
 
 export const setApiBaseUrl = (url: string) => {
   let cleaned = url.trim();
@@ -26,6 +45,17 @@ export const setApiBaseUrl = (url: string) => {
 export const apiUrl = (path: string) => {
   const normalized = path.startsWith('/') ? path : `/${path}`;
   return `${apiBaseUrl}${normalized}`;
+};
+
+export const checkApiHealth = async (timeoutMs: number = 5000) => {
+  const startedAt = Date.now();
+  const response = await request<{ status: string }>('/health', { timeoutMs });
+  return {
+    ok: response.status === 'ok',
+    status: response.status,
+    baseUrl: getApiBaseUrl(),
+    elapsedMs: Date.now() - startedAt,
+  };
 };
 
 export interface FetchOptions {

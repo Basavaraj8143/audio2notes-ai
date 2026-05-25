@@ -4,6 +4,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { Theme } from '../components/Theme';
 import { Card } from '../components/Card';
 import { CustomButton } from '../components/CustomButton';
+import { getApiBaseUrl } from '../services/apiClient';
 import { uploadAudioFile } from '../services/notesService';
 import { Session } from '../types';
 
@@ -133,6 +134,7 @@ export const UploadScreen: React.FC<UploadScreenProps> = ({ onSessionReady, onNa
 
       <Card style={styles.uploadCard}>
         <Text style={styles.cardTitle}>Audio Upload Studio</Text>
+        <Text style={styles.backendHint}>Backend: {getApiBaseUrl()}</Text>
         
         {file ? (
           <View style={styles.fileDetail}>
@@ -279,6 +281,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Theme.colors.textPrimary,
     marginBottom: 16,
+  },
+  backendHint: {
+    fontSize: 11,
+    color: Theme.colors.textMuted,
+    marginBottom: 12,
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   dropzone: {
     borderWidth: 2,
