@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Audio2Notes",
+    "slug": "audio2notes-mobile",
+    "version": "1.0.0",
+    "sdkVersion": "54.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "audio2notes",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#f4f7fc"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.audio2notes.mobile"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#f4f7fc"
+      },
+      "package": "com.audio2notes.mobile"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-document-picker"
+    ]
+  }
+}
+
