@@ -4,10 +4,11 @@ Audio2Notes AI converts lecture audio into structured study notes and supports g
 
 ## Overview
 
-This project is a two-part application:
+This project is a three-part application:
 
 - **Backend**: FastAPI service for audio preprocessing, transcription, note generation, retrieval, session persistence, and exports
-- **Frontend**: React + Vite interface for upload, transcript review, notes viewing, history, and Q&A
+- **Web Frontend**: React + Vite interface for upload, transcript review, notes viewing, history, and Q&A
+- **Mobile App**: Expo + React Native client for upload, transcript review, note generation, history, Q&A, and export
 
 The current workflow is review-first: users upload audio, inspect the transcript, and only then approve note generation.
 
@@ -27,6 +28,7 @@ The current workflow is review-first: users upload audio, inspect the transcript
 - Export notes as PDF, DOCX, and TXT
 - Session history for completed runs
 - SQLite-backed session persistence
+- Expo mobile client with on-device backend URL configuration and connection testing
 
 ## Architecture
 
@@ -50,7 +52,8 @@ The current workflow is review-first: users upload audio, inspect the transcript
 - **LLM providers**: Mistral, OpenRouter, Ollama
 - **Retrieval**: sentence-transformers, FAISS
 - **Export**: reportlab, python-docx
-- **Frontend**: React, React Router, Vite
+- **Web Frontend**: React, React Router, Vite
+- **Mobile**: Expo, React Native, TypeScript
 
 ## Project Structure
 
@@ -81,6 +84,18 @@ The current workflow is review-first: users upload audio, inspect the transcript
 |   |-- package.json
 |   |-- vercel.json
 |   `-- vite.config.js
+|-- mobile/
+|   |-- app/
+|   |   `-- App.tsx
+|   |-- src/
+|   |   |-- components/
+|   |   |-- screens/
+|   |   |-- services/
+|   |   `-- types/
+|   |-- App.tsx
+|   |-- app.json
+|   |-- index.ts
+|   `-- package.json
 |-- .env.example
 |-- DEPLOYMENT.md
 |-- PROJECT_REPORT_REFERENCE.md
@@ -159,6 +174,33 @@ npm --prefix frontend run dev
 Frontend URL:
 
 - `http://127.0.0.1:5173`
+
+### 6. Start the mobile app
+
+From the repository root in a third terminal:
+
+```powershell
+npm --prefix mobile install
+npm --prefix mobile run start
+```
+
+This starts the Expo dev server for the React Native app in `mobile/`.
+
+Mobile notes:
+
+- **Android emulator** uses `http://10.0.2.2:8000`
+- **iOS simulator** uses `http://localhost:8000`
+- **Physical device** should use your computer's LAN IP, for example `http://192.168.1.10:8000`
+- The mobile app includes a **Settings** screen where you can save the backend URL and run a connection test against `/health`
+- For real devices, start the backend with `--host 0.0.0.0`
+
+Typical mobile run flow:
+
+1. Start the backend.
+2. Run `npm --prefix mobile run start`.
+3. Open Expo Go or a simulator.
+4. In the mobile app, confirm the backend URL in **Settings**.
+5. Tap **Test Connection** before uploading audio on a physical device.
 
 ## Deploying to Vercel + Render
 
@@ -243,6 +285,10 @@ Environment is loaded by `backend/core/config.py` and the frontend Vite config.
 
 - `VITE_API_BASE_URL`
 - `VITE_API_DOCS_URL`
+
+### Mobile app
+
+The Expo mobile app currently reads its backend URL at runtime from the in-app Settings screen rather than from a committed `.env` file. It can also suggest the Expo host machine address automatically during local development.
 
 ## API Endpoints
 
@@ -335,6 +381,18 @@ Make sure:
 
 - backend is running on `127.0.0.1:8000`
 - frontend `.env` points `VITE_API_BASE_URL` to the correct backend URL if you are not relying on the dev proxy
+
+### Mobile app gets stuck on the upload pipeline
+
+Check the following:
+
+- backend is running and reachable at `/health`
+- for a physical phone, the mobile Settings screen points to `http://YOUR_LAN_IP:8000`, not `10.0.2.2`
+- backend was started with `--host 0.0.0.0`
+- phone and development machine are on the same Wi-Fi network
+- firewall is not blocking port `8000`
+
+Remember that mobile upload is not instant: the backend finishes chunking and transcription before `/api/v1/audio/upload` returns, so longer audio files can remain on the pipeline screen for a while even when the connection is correct.
 
 ### CORS errors after Vercel + Render deployment
 
